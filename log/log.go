@@ -21,11 +21,11 @@ var (
 type Lvl string
 
 const (
-	ERROR = Lvl("ERROR")
-	WARN  = Lvl("WARN")
-	INFO  = Lvl("INFO")
-	DEBUG = Lvl("DEBUG")
-	TRACE = Lvl("TRACE")
+	Error = Lvl("ERROR")
+	Warn  = Lvl("WARN")
+	Info  = Lvl("INFO")
+	Debug = Lvl("DEBUG")
+	Trace = Lvl("TRACE")
 )
 
 // SetSecret sets secret used to sign logs
