@@ -133,7 +133,10 @@ func (t *Transporter) handleTailer(raddr *net.UDPAddr) {
 
 func (t *Transporter) handlePing(raddr *net.UDPAddr) {
 	t.mu.Lock()
-	t.subs[raddr.AddrPort().String()].lastPing = time.Now()
+	sub := t.subs[raddr.AddrPort().String()]
+	if sub != nil {
+		sub.lastPing = time.Now()
+	}
 	t.mu.Unlock()
 }
 
