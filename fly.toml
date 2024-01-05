@@ -29,7 +29,3 @@ primary_region = "ams"
   [[services.ports]]
     port = 6102
 
-[[vm]]
-  cpu_kind = "shared"
-  cpus = 1
-  memory_mb = 1024
