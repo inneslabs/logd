@@ -13,12 +13,20 @@ import (
 	"github.com/swissinfo-ch/logd/pack"
 )
 
-const bufferSize = 2048
+const (
+	PingTimeout = time.Second * 2
+	bufferSize  = 2048
+)
+
+type Sub struct {
+	raddr    *net.UDPAddr
+	lastPing time.Time
+}
 
 type Transporter struct {
 	In          chan []byte
 	Out         chan []byte
-	subs        map[string]*net.UDPAddr
+	subs        map[string]*Sub
 	mu          sync.Mutex
 	readSecret  []byte
 	writeSecret []byte
@@ -28,7 +36,7 @@ func NewTransporter() *Transporter {
 	return &Transporter{
 		In:   make(chan []byte),
 		Out:  make(chan []byte, 10),
-		subs: make(map[string]*net.UDPAddr),
+		subs: make(map[string]*Sub),
 		mu:   sync.Mutex{},
 	}
 }
@@ -76,14 +84,18 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 				fmt.Println("unpack msg err:", err)
 				continue
 			}
+			valid, err := auth.Verify(t.readSecret, sum, timeBytes, payload)
+			if err != nil || !valid {
+				fmt.Printf("%s unauthorised: %s\r\n", raddr.IP.String(), err)
+				continue
+			}
 			// if tailing, first msg is "tail"
 			if string(payload) == "tail" {
-				valid, err := auth.Verify(t.readSecret, sum, timeBytes, payload)
-				if err != nil || !valid {
-					fmt.Printf("%s unauthorised: %s\r\n", raddr.IP.String(), err)
-					continue
-				}
 				go t.handleTailer(raddr)
+				continue
+			}
+			if string(payload) == "ping" {
+				go t.handlePing(raddr)
 				continue
 			}
 			t.In <- payload
@@ -93,7 +105,10 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 
 func (t *Transporter) handleTailer(raddr *net.UDPAddr) {
 	t.mu.Lock()
-	t.subs[raddr.AddrPort().String()] = raddr
+	t.subs[raddr.AddrPort().String()] = &Sub{
+		raddr:    raddr,
+		lastPing: time.Now(),
+	}
 	t.mu.Unlock()
 	time.Sleep(time.Millisecond * 50)
 	e := &msg.Msg{
@@ -108,6 +123,12 @@ func (t *Transporter) handleTailer(raddr *net.UDPAddr) {
 	t.Out <- data
 }
 
+func (t *Transporter) handlePing(raddr *net.UDPAddr) {
+	t.mu.Lock()
+	t.subs[raddr.AddrPort().String()].lastPing = time.Now()
+	t.mu.Unlock()
+}
+
 func (t *Transporter) writeToConn(ctx context.Context, conn *net.UDPConn) {
 	for {
 		select {
@@ -115,14 +136,24 @@ func (t *Transporter) writeToConn(ctx context.Context, conn *net.UDPConn) {
 			return
 		case msg := <-t.Out:
 			for raddr, sub := range t.subs {
-				_, err := conn.WriteToUDP(msg, sub)
-				if err != nil {
-					fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
-					t.mu.Lock()
-					delete(t.subs, raddr)
-					t.mu.Unlock()
+				if sub.lastPing.Before(time.Now().Add(-PingTimeout)) {
+					t.kickSub(raddr)
+					continue
 				}
+				go func(msg []byte, sub *Sub, raddr string) {
+					_, err := conn.WriteToUDP(msg, sub.raddr)
+					if err != nil {
+						fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
+					}
+				}(msg, sub, raddr)
 			}
 		}
 	}
+}
+
+func (t *Transporter) kickSub(raddr string) {
+	t.mu.Lock()
+	delete(t.subs, raddr)
+	t.mu.Unlock()
+	fmt.Printf("kicked %s, no ping received, timed out\r\n", raddr)
 }
