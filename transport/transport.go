@@ -8,7 +8,9 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/swissinfo-ch/logd/auth"
 	"github.com/swissinfo-ch/logd/msg"
+	"github.com/swissinfo-ch/logd/unpack"
 )
 
 const bufferSize = 2048
@@ -69,14 +71,19 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 			if err != nil {
 				continue
 			}
-			sum, payload, err := unpackMsg(buf[:n])
+			sum, timeBytes, payload, err := unpack.UnpackMsg(buf[:n])
 			if err != nil {
 				fmt.Println("unpack msg err:", err)
 				continue
 			}
 			// if tailing, first msg is "tail"
 			if string(payload) == "tail" {
-				go t.handleTailer(raddr, sum, payload)
+				valid, err := auth.Verify(t.readSecret, sum, timeBytes, payload)
+				if err != nil || !valid {
+					fmt.Printf("%s unauthorised\r\n", raddr.IP.String())
+					continue
+				}
+				go t.handleTailer(raddr)
 				continue
 			}
 			t.In <- payload
@@ -84,11 +91,7 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 	}
 }
 
-func (t *Transporter) handleTailer(raddr *net.UDPAddr, sum, payload []byte) {
-	valid, err := validateSum(t.readSecret, sum, payload)
-	if err != nil || !valid {
-		return
-	}
+func (t *Transporter) handleTailer(raddr *net.UDPAddr) {
 	t.mu.Lock()
 	t.subs[raddr.AddrPort().String()] = raddr
 	t.mu.Unlock()

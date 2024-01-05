@@ -6,15 +6,17 @@ import (
 	"os"
 	"time"
 
+	"github.com/swissinfo-ch/logd/auth"
+	"github.com/swissinfo-ch/logd/conn"
 	"github.com/swissinfo-ch/logd/msg"
 )
 
 var (
-	conn   net.Conn
-	env    = os.Getenv("SWI_ENV")
-	svc    = os.Getenv("SWI_SVC")
-	fn     = os.Getenv("SWI_FN")
-	secret []byte
+	logdConn net.Conn
+	env      = os.Getenv("SWI_ENV")
+	svc      = os.Getenv("SWI_SVC")
+	fn       = os.Getenv("SWI_FN")
+	secret   []byte
 )
 
 type Lvl string
@@ -36,8 +38,8 @@ func SetSecret(s []byte) {
 // Log writes a logd entry to machine at LOGD_HOSTNAME
 // Values of SWI_ENV, SWI_SVC & SWI_FN are used
 func Log(lvl Lvl, template string, args ...interface{}) {
-	if conn == nil {
-		conn = GetConn()
+	if logdConn == nil {
+		logdConn = conn.GetConn()
 	}
 
 	// build msg
@@ -51,14 +53,14 @@ func Log(lvl Lvl, template string, args ...interface{}) {
 	}
 
 	// get ephemeral signature
-	signedMsg, err := Sign(secret, msg, time.Now())
+	signedMsg, err := auth.Sign(secret, msg, time.Now())
 	if err != nil {
 		fmt.Println("logd.log sign msg err:", err)
 		return
 	}
 
 	// write to socket
-	_, err = conn.Write(signedMsg)
+	_, err = logdConn.Write(signedMsg)
 	if err != nil {
 		fmt.Println("logd.log write udp err:", err)
 	}
