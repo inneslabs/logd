@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/swissinfo-ch/logd/auth"
+	"github.com/swissinfo-ch/logd/transport"
 )
 
 func Tail(conn net.Conn, readSecret []byte) (<-chan []byte, error) {
@@ -30,7 +31,7 @@ func Tail(conn net.Conn, readSecret []byte) (<-chan []byte, error) {
 	}(conn)
 	go func(conn net.Conn, readSecret []byte) {
 		for {
-			time.Sleep(time.Second)
+			time.Sleep(transport.PingPeriod)
 			sig, err := auth.Sign(readSecret, []byte("ping"), time.Now())
 			if err != nil {
 				fmt.Println("sign ping msg err:", err)

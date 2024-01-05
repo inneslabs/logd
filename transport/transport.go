@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	PingTimeout = time.Second * 10
-	bufferSize  = 2048
+	PingPeriod = time.Second * 2
+	bufferSize = 2048
 )
 
 type Sub struct {
@@ -147,7 +147,7 @@ func (t *Transporter) writeToConn(ctx context.Context, conn *net.UDPConn) {
 			return
 		case msg := <-t.Out:
 			for raddr, sub := range t.subs {
-				if sub.lastPing.Before(time.Now().Add(-PingTimeout)) {
+				if sub.lastPing.Before(time.Now().Add(-PingPeriod * 5)) {
 					t.kickSub(raddr)
 					continue
 				}
