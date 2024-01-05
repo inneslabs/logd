@@ -3,7 +3,7 @@
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = "logd-twilight-wind-1658"
+app = "logd"
 primary_region = "ams"
 
 [build]
@@ -32,4 +32,4 @@ dockerfile = "fly.Dockerfile"
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
-  memory_mb = 1024
+  memory_mb = 2048
