@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	PingTimeout = time.Second * 2
+	PingTimeout = time.Second * 10
 	bufferSize  = 2048
 )
 
