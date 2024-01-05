@@ -71,7 +71,7 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 			if err != nil {
 				continue
 			}
-			sum, timeBytes, payload, err := pack.UnpackMsg(buf[:n])
+			sum, timeBytes, payload, err := pack.UnpackSignedMsg(buf[:n])
 			if err != nil {
 				fmt.Println("unpack msg err:", err)
 				continue
@@ -80,7 +80,7 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 			if string(payload) == "tail" {
 				valid, err := auth.Verify(t.readSecret, sum, timeBytes, payload)
 				if err != nil || !valid {
-					fmt.Printf("%s unauthorised\r\n", raddr.IP.String())
+					fmt.Printf("%s unauthorised: %s\r\n", raddr.IP.String(), err)
 					continue
 				}
 				go t.handleTailer(raddr)

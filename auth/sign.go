@@ -11,7 +11,7 @@ import (
 const (
 	timeLen       = 8
 	hashLen       = 32
-	timeThreshold = time.Millisecond * 50
+	timeThreshold = time.Millisecond * 1000
 )
 
 func Sign(secret, payload []byte, t time.Time) ([]byte, error) {

@@ -12,7 +12,7 @@ const (
 	timeLen = 8
 )
 
-func UnpackMsg(msg []byte) (sum, timeBytes, payload []byte, err error) {
+func UnpackSignedMsg(msg []byte) (sum, timeBytes, payload []byte, err error) {
 	if len(msg) < sumLen+timeLen {
 		return nil, nil, nil, errors.New("msg too short")
 	}
