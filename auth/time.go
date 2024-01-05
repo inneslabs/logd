@@ -32,7 +32,7 @@ func int64ToBytes(num int64) ([]byte, error) {
 }
 
 func bytesToInt64(b []byte) (int64, error) {
-	if len(b) != 8 {
+	if len(b) != timeLen {
 		return 0, fmt.Errorf("byte slice must be exactly 8 bytes long")
 	}
 
