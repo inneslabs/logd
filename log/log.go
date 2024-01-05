@@ -6,7 +6,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/fxamacker/cbor/v2"
 	"github.com/swissinfo-ch/logd/msg"
 )
 
@@ -41,25 +40,25 @@ func Log(lvl Lvl, template string, args ...interface{}) {
 		conn = GetConn()
 	}
 
-	// marshal payload
-	payload, err := cbor.Marshal(&msg.Msg{
+	// build msg
+	msg := &msg.Msg{
 		Timestamp: time.Now().UnixNano(),
 		Env:       env,
 		Svc:       svc,
 		Fn:        fn,
 		Lvl:       string(lvl),
 		Msg:       fmt.Sprintf(template, args...),
-	})
-	if err != nil {
-		fmt.Println("logd.log cbor marshal err:", err)
-		return
 	}
 
 	// get ephemeral signature
-	signed := Sign(secret, payload, time.Now())
+	signedMsg, err := Sign(secret, msg, time.Now())
+	if err != nil {
+		fmt.Println("logd.log sign msg err:", err)
+		return
+	}
 
 	// write to socket
-	_, err = conn.Write(signed)
+	_, err = conn.Write(signedMsg)
 	if err != nil {
 		fmt.Println("logd.log write udp err:", err)
 	}
