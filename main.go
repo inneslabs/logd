@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/intob/logd/ring"
-	"github.com/intob/logd/transport"
+	"github.com/swissinfo-ch/logd/ring"
+	"github.com/swissinfo-ch/logd/transport"
 )
 
 var (

@@ -8,7 +8,7 @@ import (
 	"strconv"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/intob/logd/logdentry"
+	"github.com/swissinfo-ch/logd/msg"
 )
 
 type Webserver struct{}
@@ -78,13 +78,13 @@ func (s *Webserver) handleRead(w http.ResponseWriter, r *http.Request) {
 	envQ := r.URL.Query().Get("env")
 	svcQ := r.URL.Query().Get("svc")
 	fnQ := r.URL.Query().Get("fn")
-	results := make([]*logdentry.Entry, 0)
+	results := make([]*msg.Msg, 0)
 	pages := 0
 	for len(results) < limit && pages*limit < buf.Size()/10 {
 		items := buf.Read(offset, limit)
 		pages++
 		offset += limit
-		e := &logdentry.Entry{}
+		e := &msg.Msg{}
 		for _, i := range items {
 			err := cbor.Unmarshal(*i, e)
 			if err != nil {

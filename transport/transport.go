@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
-	"github.com/intob/logd/logdentry"
+	"github.com/swissinfo-ch/logd/msg"
 )
 
 const bufferSize = 2048
@@ -93,7 +93,7 @@ func (t *Transporter) handleTailer(raddr *net.UDPAddr, sum, payload []byte) {
 	t.subs[raddr.AddrPort().String()] = raddr
 	t.mu.Unlock()
 	time.Sleep(time.Millisecond * 50)
-	e := &logdentry.Entry{
+	e := &msg.Msg{
 		Fn:  "logd",
 		Msg: fmt.Sprintf("tailer %s joined", raddr),
 	}

@@ -1,6 +1,6 @@
-package logdentry
+package msg
 
-type Entry struct {
+type Msg struct {
 	Timestamp int64  `json:"t"`
 	Env       string `json:"env"`
 	Svc       string `json:"svc"`

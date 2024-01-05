@@ -1,4 +1,4 @@
-package logdutil
+package log
 
 import (
 	"errors"
@@ -7,22 +7,12 @@ import (
 	"os"
 )
 
-var logdHost string
+var logdHostname = os.Getenv("LOGD_HOSTNAME")
 
-func init() {
-	logdHost = os.Getenv("LOGD_HOST")
-}
-
-func GetConn(host *string) net.Conn {
-	var (
-		addr string
-		err  error
-	)
-	if host == nil {
-		addr, err = getAddr(logdHost)
-	} else {
-		addr, err = getAddr(*host)
-	}
+// GetConn returns a udp socket for logd
+// using the value of LOGD_HOSTNAME
+func GetConn() net.Conn {
+	addr, err := getAddr(logdHostname)
 	if err != nil {
 		panic("get addr err: " + err.Error())
 	}
