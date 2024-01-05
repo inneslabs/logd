@@ -1,4 +1,4 @@
-# fly.toml app configuration file generated for logd-twilight-wind-1658 on 2024-01-01T17:03:23+01:00
+# fly.toml app configuration file generated for logd on 2024-01-05T10:20:39+01:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
@@ -7,7 +7,7 @@ app = "logd"
 primary_region = "ams"
 
 [build]
-dockerfile = "fly.Dockerfile"
+  dockerfile = "fly.Dockerfile"
 
 [env]
   BUFFER_SIZE = "100000"
@@ -15,16 +15,16 @@ dockerfile = "fly.Dockerfile"
   UDP_LADDR = "fly-global-services:6102"
 
 [[services]]
-  internal_port = 6101
   protocol = "tcp"
+  internal_port = 6101
 
   [[services.ports]]
-    handlers = ["tls", "http"]
     port = 443
+    handlers = ["tls", "http"]
 
 [[services]]
-  internal_port = 6102
   protocol = "udp"
+  internal_port = 6102
 
   [[services.ports]]
     port = 6102
@@ -32,4 +32,4 @@ dockerfile = "fly.Dockerfile"
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
-  memory_mb = 2048
+  memory_mb = 1024
