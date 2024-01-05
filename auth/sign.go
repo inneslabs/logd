@@ -6,9 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"time"
-
-	"github.com/fxamacker/cbor/v2"
-	"github.com/swissinfo-ch/logd/msg"
 )
 
 const (
@@ -17,14 +14,10 @@ const (
 	timeThreshold = time.Millisecond * 50
 )
 
-func Sign(secret []byte, msg *msg.Msg, t time.Time) ([]byte, error) {
+func Sign(secret, payload []byte, t time.Time) ([]byte, error) {
 	timeBytes, err := convertTimeToBytes(t)
 	if err != nil {
 		return nil, fmt.Errorf("convert time to bytes err: %w", err)
-	}
-	payload, err := cbor.Marshal(msg)
-	if err != nil {
-		return nil, fmt.Errorf("cbor marshal err: %w", err)
 	}
 	data := append(secret, timeBytes...)
 	data = append(data, payload...)

@@ -5,20 +5,23 @@ import (
 	"time"
 
 	"github.com/swissinfo-ch/logd/msg"
-	"github.com/swissinfo-ch/logd/unpack"
+	"github.com/swissinfo-ch/logd/pack"
 )
 
 func TestSignAndVerify(t *testing.T) {
 	sec := []byte("testsecret")
-	msg := &msg.Msg{
+	payload, err := pack.PackMsg(&msg.Msg{
 		Timestamp: time.Now().UnixMilli(),
 		Msg:       "this is a test",
-	}
-	signedMsg, err := Sign(sec, msg, time.Now())
+	})
 	if err != nil {
 		t.FailNow()
 	}
-	sum, timeBytes, payload, err := unpack.UnpackMsg(signedMsg)
+	signedMsg, err := Sign(sec, payload, time.Now())
+	if err != nil {
+		t.FailNow()
+	}
+	sum, timeBytes, payload, err := pack.UnpackMsg(signedMsg)
 	if err != nil {
 		t.FailNow()
 	}
@@ -30,15 +33,18 @@ func TestSignAndVerify(t *testing.T) {
 
 func TestSignAndVerifyInvalid(t *testing.T) {
 	sec := []byte("testsecret")
-	msg := &msg.Msg{
+	payload, err := pack.PackMsg(&msg.Msg{
 		Timestamp: time.Now().UnixMilli(),
 		Msg:       "this is a test",
-	}
-	signedMsg, err := Sign(sec, msg, time.Now().Add(timeThreshold*2))
+	})
 	if err != nil {
 		t.FailNow()
 	}
-	sum, timeBytes, payload, err := unpack.UnpackMsg(signedMsg)
+	signedMsg, err := Sign(sec, payload, time.Now().Add(timeThreshold*2))
+	if err != nil {
+		t.FailNow()
+	}
+	sum, timeBytes, payload, err := pack.UnpackMsg(signedMsg)
 	if err != nil {
 		t.FailNow()
 	}

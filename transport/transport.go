@@ -10,7 +10,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/swissinfo-ch/logd/auth"
 	"github.com/swissinfo-ch/logd/msg"
-	"github.com/swissinfo-ch/logd/unpack"
+	"github.com/swissinfo-ch/logd/pack"
 )
 
 const bufferSize = 2048
@@ -71,7 +71,7 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 			if err != nil {
 				continue
 			}
-			sum, timeBytes, payload, err := unpack.UnpackMsg(buf[:n])
+			sum, timeBytes, payload, err := pack.UnpackMsg(buf[:n])
 			if err != nil {
 				fmt.Println("unpack msg err:", err)
 				continue

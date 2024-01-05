@@ -1,7 +1,10 @@
-package unpack
+package pack
 
 import (
 	"errors"
+
+	"github.com/fxamacker/cbor/v2"
+	"github.com/swissinfo-ch/logd/msg"
 )
 
 const (
@@ -17,4 +20,8 @@ func UnpackMsg(msg []byte) (sum, timeBytes, payload []byte, err error) {
 		msg[sumLen : sumLen+timeLen],
 		msg[sumLen+timeLen:],
 		err
+}
+
+func PackMsg(msg *msg.Msg) ([]byte, error) {
+	return cbor.Marshal(msg)
 }

@@ -1,29 +1,32 @@
 package tail
 
 import (
-	"bytes"
-	"crypto/sha256"
 	"fmt"
+	"net"
+	"time"
+
+	"github.com/swissinfo-ch/logd/auth"
 )
 
-func AuthMsg(secret, payload []byte) ([]byte, error) {
-	h := sha256.New()
-	_, err := h.Write(payload)
+func Tail(conn net.Conn, readSecret []byte) (<-chan []byte, error) {
+	sig, err := auth.Sign(readSecret, []byte("tail"), time.Now())
 	if err != nil {
-		return nil, fmt.Errorf("err writing payload to hash: %w", err)
+		return nil, fmt.Errorf("sign tail msg err: %w", err)
 	}
-	_, err = h.Write(secret)
+	_, err = conn.Write(sig)
 	if err != nil {
-		return nil, fmt.Errorf("err writing secret to hash: %w", err)
+		return nil, fmt.Errorf("write tail msg err: %w", err)
 	}
-	buf := &bytes.Buffer{}
-	_, err = buf.Write(h.Sum(nil))
-	if err != nil {
-		return nil, fmt.Errorf("err writing sum to buffer: %w", err)
-	}
-	_, err = buf.Write(payload)
-	if err != nil {
-		return nil, fmt.Errorf("err writing payload to buffer: %w", err)
-	}
-	return buf.Bytes(), nil
+	out := make(chan []byte)
+	go func(conn net.Conn) {
+		for {
+			buf := make([]byte, 2048)
+			n, err := conn.Read(buf)
+			if err != nil {
+				fmt.Printf("error reading from conn: %s\r\n", err)
+			}
+			out <- buf[:n]
+		}
+	}(conn)
+	return out, nil
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/swissinfo-ch/logd/auth"
 	"github.com/swissinfo-ch/logd/conn"
 	"github.com/swissinfo-ch/logd/msg"
+	"github.com/swissinfo-ch/logd/pack"
 )
 
 var (
@@ -43,17 +44,21 @@ func Log(lvl Lvl, template string, args ...interface{}) {
 	}
 
 	// build msg
-	msg := &msg.Msg{
+	payload, err := pack.PackMsg(&msg.Msg{
 		Timestamp: time.Now().UnixNano(),
 		Env:       env,
 		Svc:       svc,
 		Fn:        fn,
 		Lvl:       string(lvl),
 		Msg:       fmt.Sprintf(template, args...),
+	})
+	if err != nil {
+		fmt.Println("logd.log pack msg err:", err)
+		return
 	}
 
 	// get ephemeral signature
-	signedMsg, err := auth.Sign(secret, msg, time.Now())
+	signedMsg, err := auth.Sign(secret, payload, time.Now())
 	if err != nil {
 		fmt.Println("logd.log sign msg err:", err)
 		return
