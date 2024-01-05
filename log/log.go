@@ -57,6 +57,8 @@ func Log(lvl Lvl, template string, args ...interface{}) {
 
 	// get ephemeral signature
 	signed := Sign(secret, payload, time.Now())
+
+	// write to socket
 	_, err = conn.Write(signed)
 	if err != nil {
 		fmt.Println("logd.log write udp err:", err)
