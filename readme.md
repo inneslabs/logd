@@ -4,10 +4,13 @@ A non-blocking circular buffer to store millions of logs per hour.
 ![A circular buffer](./doc/circular_buffer.svg)
 
 # Logd is a circular buffer
-Logd (pronounced "logged") will never run out of storage, and it will never reallocate memory. As the buffer becomes full, each write automatically overwrites the oldest element.
+Logd (pronounced "logged") will never run out of storage. Reads & writes are constant time.
+
+As the buffer becomes full, each write overwrites the oldest element.
 
 # Auth
-Logd authenticates clients for either reading or writing using 2 shared secrets. These are stored encrypted in our secrets SOPS file.
+Logd authenticates clients for either reading or writing using 2 shared secrets.
+These are stored encrypted in our secrets SOPS file.
 
 # HTTP API
 Logd starts a http server.
