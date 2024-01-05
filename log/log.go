@@ -12,16 +12,6 @@ import (
 	"github.com/swissinfo-ch/logd/pack"
 )
 
-var (
-	logdConn net.Conn
-	env      = os.Getenv("SWI_ENV")
-	svc      = os.Getenv("SWI_SVC")
-	fn       = os.Getenv("SWI_FN")
-	secret   []byte
-)
-
-type Lvl string
-
 const (
 	Error = Lvl("ERROR")
 	Warn  = Lvl("WARN")
@@ -30,25 +20,42 @@ const (
 	Trace = Lvl("TRACE")
 )
 
-// SetSecret sets secret used to sign logs
-// When calling Log
-func SetSecret(s []byte) {
-	secret = s
+type Lvl string
+
+type Logger struct {
+	Conn   net.Conn
+	Secret []byte
+	Env    string
+	Svc    string
+	Fn     string
 }
 
-// Log writes a logd entry to machine at LOGD_HOSTNAME
-// Values of SWI_ENV, SWI_SVC & SWI_FN are used
-func Log(lvl Lvl, template string, args ...interface{}) {
-	if logdConn == nil {
-		logdConn = conn.GetConn()
+func NewLogger(host string, writeSecret []byte) (*Logger, error) {
+	addr, err := conn.GetAddr(host)
+	if err != nil {
+		return nil, fmt.Errorf("get addr err: %w", err)
 	}
+	c, err := conn.GetConn(addr)
+	if err != nil {
+		return nil, fmt.Errorf("get conn err: %w", err)
+	}
+	return &Logger{
+		Conn:   c,
+		Secret: writeSecret,
+		Env:    os.Getenv("SWI_ENV"),
+		Svc:    os.Getenv("SWI_SVC"),
+		Fn:     os.Getenv("SWI_FN"),
+	}, nil
+}
 
+// Log writes a logd entry to Logger Conn
+func (l *Logger) Log(lvl Lvl, template string, args ...interface{}) {
 	// build msg
 	payload, err := pack.PackMsg(&msg.Msg{
 		Timestamp: time.Now().UnixNano(),
-		Env:       env,
-		Svc:       svc,
-		Fn:        fn,
+		Env:       l.Env,
+		Svc:       l.Svc,
+		Fn:        l.Fn,
 		Lvl:       string(lvl),
 		Msg:       fmt.Sprintf(template, args...),
 	})
@@ -58,14 +65,14 @@ func Log(lvl Lvl, template string, args ...interface{}) {
 	}
 
 	// get ephemeral signature
-	signedMsg, err := auth.Sign(secret, payload, time.Now())
+	signedMsg, err := auth.Sign(l.Secret, payload, time.Now())
 	if err != nil {
 		fmt.Println("logd.log sign msg err:", err)
 		return
 	}
 
 	// write to socket
-	_, err = logdConn.Write(signedMsg)
+	_, err = l.Conn.Write(signedMsg)
 	if err != nil {
 		fmt.Println("logd.log write udp err:", err)
 	}

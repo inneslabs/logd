@@ -4,26 +4,19 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 )
-
-var logdHostname = os.Getenv("LOGD_HOSTNAME")
 
 // GetConn returns a udp socket for logd
 // using the value of LOGD_HOSTNAME
-func GetConn() net.Conn {
-	addr, err := getAddr(logdHostname)
-	if err != nil {
-		panic("get addr err: " + err.Error())
-	}
+func GetConn(addr string) (net.Conn, error) {
 	conn, err := net.Dial("udp", addr+":6102")
 	if err != nil {
-		panic("failed to connect: " + err.Error())
+		return nil, fmt.Errorf("failed to connect: %w", err)
 	}
-	return conn
+	return conn, nil
 }
 
-func getAddr(host string) (string, error) {
+func GetAddr(host string) (string, error) {
 	addrs, err := net.LookupHost(host)
 	if err != nil {
 		return "", fmt.Errorf("lookup host err: %w", err)
