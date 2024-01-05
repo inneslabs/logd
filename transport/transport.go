@@ -84,18 +84,26 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 				fmt.Println("unpack msg err:", err)
 				continue
 			}
-			valid, err := auth.Verify(t.readSecret, sum, timeBytes, payload)
-			if err != nil || !valid {
+			payloadStr := string(payload)
+			if payloadStr == "tail" || payloadStr == "ping" {
+				valid, err := auth.Verify(t.readSecret, sum, timeBytes, payload)
+				if !valid || err != nil {
+					fmt.Printf("%s unauthorised: %s\r\n", raddr.IP.String(), err)
+					continue
+				}
+				// if tailing, first msg is "tail"
+				if string(payload) == "tail" {
+					go t.handleTailer(raddr)
+					continue
+				}
+				if string(payload) == "ping" {
+					go t.handlePing(raddr)
+					continue
+				}
+			}
+			valid, err := auth.Verify(t.writeSecret, sum, timeBytes, payload)
+			if !valid || err != nil {
 				fmt.Printf("%s unauthorised: %s\r\n", raddr.IP.String(), err)
-				continue
-			}
-			// if tailing, first msg is "tail"
-			if string(payload) == "tail" {
-				go t.handleTailer(raddr)
-				continue
-			}
-			if string(payload) == "ping" {
-				go t.handlePing(raddr)
 				continue
 			}
 			t.In <- payload
