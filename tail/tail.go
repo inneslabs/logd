@@ -28,7 +28,7 @@ func Tail(conn net.Conn, readSecret []byte) (<-chan []byte, error) {
 			out <- buf[:n]
 		}
 	}(conn)
-	go func(conn net.Conn) {
+	go func(conn net.Conn, readSecret []byte) {
 		for {
 			time.Sleep(time.Second)
 			sig, err := auth.Sign(readSecret, []byte("ping"), time.Now())
@@ -41,6 +41,6 @@ func Tail(conn net.Conn, readSecret []byte) (<-chan []byte, error) {
 				fmt.Println("write ping msg err:", err)
 			}
 		}
-	}(conn)
+	}(conn, readSecret)
 	return out, nil
 }
