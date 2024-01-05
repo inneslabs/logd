@@ -18,6 +18,16 @@ var (
 	secret []byte
 )
 
+type Lvl string
+
+const (
+	ERROR = Lvl("ERROR")
+	WARN  = Lvl("WARN")
+	INFO  = Lvl("INFO")
+	DEBUG = Lvl("DEBUG")
+	TRACE = Lvl("TRACE")
+)
+
 // SetSecret sets secret used to sign logs
 // When calling Log
 func SetSecret(s []byte) {
@@ -26,7 +36,7 @@ func SetSecret(s []byte) {
 
 // Log writes a logd entry to machine at LOGD_HOSTNAME
 // Values of SWI_ENV, SWI_SVC & SWI_FN are used
-func Log(lvl, template string, args ...interface{}) {
+func Log(lvl Lvl, template string, args ...interface{}) {
 	if conn == nil {
 		conn = GetConn()
 	}
@@ -37,7 +47,7 @@ func Log(lvl, template string, args ...interface{}) {
 		Env:       env,
 		Svc:       svc,
 		Fn:        fn,
-		Lvl:       lvl,
+		Lvl:       string(lvl),
 		Msg:       fmt.Sprintf(template, args...),
 	})
 	if err != nil {
