@@ -118,8 +118,6 @@ func (t *Transporter) handleTailer(raddr *net.UDPAddr) {
 		lastPing: time.Now(),
 	}
 	t.mu.Unlock()
-	time.Sleep(time.Millisecond * 50)
-
 }
 
 func (t *Transporter) handlePing(raddr *net.UDPAddr) {
