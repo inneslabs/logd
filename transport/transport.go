@@ -7,15 +7,15 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fxamacker/cbor/v2"
 	"github.com/swissinfo-ch/logd/auth"
 	"github.com/swissinfo-ch/logd/msg"
 	"github.com/swissinfo-ch/logd/pack"
 )
 
 const (
-	PingPeriod = time.Second * 2
-	bufferSize = 2048
+	PingPeriod            = time.Second
+	KickAfterMissingPings = 10
+	bufferSize            = 2048
 )
 
 type Sub struct {
@@ -119,16 +119,7 @@ func (t *Transporter) handleTailer(raddr *net.UDPAddr) {
 	}
 	t.mu.Unlock()
 	time.Sleep(time.Millisecond * 50)
-	e := &msg.Msg{
-		Fn:  "logd",
-		Msg: fmt.Sprintf("tailer %s joined", raddr),
-	}
-	data, err := cbor.Marshal(e)
-	if err != nil {
-		fmt.Println("handle tailer: cbor marshal err:", err)
-		return
-	}
-	t.Out <- data
+
 }
 
 func (t *Transporter) handlePing(raddr *net.UDPAddr) {
@@ -147,8 +138,8 @@ func (t *Transporter) writeToConn(ctx context.Context, conn *net.UDPConn) {
 			return
 		case msg := <-t.Out:
 			for raddr, sub := range t.subs {
-				if sub.lastPing.Before(time.Now().Add(-PingPeriod * 5)) {
-					t.kickSub(raddr)
+				if sub.lastPing.Before(time.Now().Add(-(PingPeriod * KickAfterMissingPings))) {
+					t.kickSub(conn, sub, raddr)
 					continue
 				}
 				go func(msg []byte, sub *Sub, raddr string) {
@@ -162,9 +153,35 @@ func (t *Transporter) writeToConn(ctx context.Context, conn *net.UDPConn) {
 	}
 }
 
-func (t *Transporter) kickSub(raddr string) {
+// kickSub removes sub from map & broadcasts kick
+func (t *Transporter) kickSub(conn *net.UDPConn, sub *Sub, raddr string) {
 	t.mu.Lock()
 	delete(t.subs, raddr)
 	t.mu.Unlock()
+	t.broadcast(fmt.Sprintf("kicked %s, no ping received, timed out", raddr))
 	fmt.Printf("kicked %s, no ping received, timed out\r\n", raddr)
+	// notify sub directly
+	payload, err := pack.PackMsg(&msg.Msg{
+		Fn:  "logd",
+		Msg: "you've been kicked, ping timed out",
+	})
+	if err != nil {
+		fmt.Println("pack msg err:", err)
+	}
+	_, err = conn.WriteToUDP(payload, sub.raddr)
+	if err != nil {
+		fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
+	}
+}
+
+func (t *Transporter) broadcast(m string) error {
+	payload, err := pack.PackMsg(&msg.Msg{
+		Fn:  "logd",
+		Msg: m,
+	})
+	if err != nil {
+		return fmt.Errorf("pack msg err: %w", err)
+	}
+	t.Out <- payload
+	return nil
 }
