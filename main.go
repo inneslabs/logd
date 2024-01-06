@@ -11,16 +11,15 @@ import (
 
 	"github.com/swissinfo-ch/logd/ring"
 	"github.com/swissinfo-ch/logd/transport"
+	"github.com/swissinfo-ch/logd/web"
 )
 
 const readRoutines = 10
 
 var (
-	buf                *ring.RingBuffer
-	readSecret         []byte
-	writeSecret        []byte
-	started            time.Time
-	willTailForTesting bool
+	buf         *ring.RingBuffer
+	readSecret  []byte
+	writeSecret []byte
 )
 
 func init() {
@@ -32,8 +31,6 @@ func init() {
 	fmt.Println("initialised buffer of size", bufferSize)
 	readSecret = []byte(os.Getenv("READ_SECRET"))
 	writeSecret = []byte(os.Getenv("WRITE_SECRET"))
-	started = time.Now()
-	willTailForTesting = os.Getenv("TAIL_FOR_TESTING") != ""
 }
 
 func main() {
@@ -50,7 +47,11 @@ func main() {
 	}
 	go t.Listen(ctx, os.Getenv("UDP_LADDR"))
 
-	h := &Webserver{}
+	h := &web.Webserver{
+		ReadSecret: string(readSecret),
+		Buf:        buf,
+		Started:    time.Now(),
+	}
 	go h.ServeHttp(os.Getenv("HTTP_LADDR"))
 
 	<-ctx.Done()
@@ -58,9 +59,6 @@ func main() {
 }
 
 func readIn(ctx context.Context, t *transport.Transporter) {
-	if willTailForTesting {
-		go tailForTesting(t)
-	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -68,7 +66,16 @@ func readIn(ctx context.Context, t *transport.Transporter) {
 		case msg := <-t.In:
 			t.Out <- msg
 			buf.Write(msg)
-			// alarmSvc.In <- msg
 		}
 	}
+}
+
+func cancelOnSig(sigs chan os.Signal, cancel context.CancelFunc) {
+	switch <-sigs {
+	case syscall.SIGINT:
+		fmt.Println("\r\nreceived SIGINT")
+	case syscall.SIGTERM:
+		fmt.Println("\r\nreceived SIGTERM")
+	}
+	cancel()
 }

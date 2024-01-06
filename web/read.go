@@ -1,57 +1,20 @@
-package main
+package web
 
 import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/swissinfo-ch/logd/msg"
 )
 
-type Webserver struct{}
-
-type Info struct {
-	Writes  uint64 `json:"writes"`
-	Started int64  `json:"started"`
-}
-
-func (s *Webserver) ServeHttp(laddr string) {
-	http.Handle("/", http.HandlerFunc(s.handleRequest))
-	fmt.Println("listening http on " + laddr)
-	err := http.ListenAndServe(laddr, nil)
-	if err != nil {
-		fmt.Println("failed to start http server: " + err.Error())
-		os.Exit(1)
-	}
-}
-
-func (s *Webserver) handleRequest(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("access-control-allow-origin", "*")
-	w.Header().Set("access-control-allow-methods", "GET, POST, OPTIONS")
-	w.Header().Set("access-control-allow-headers", "authorization")
-	if r.Method == "OPTIONS" {
-		w.WriteHeader(http.StatusOK)
-		return
-	}
-	if r.Header.Get("authorization") != string(readSecret) {
-		w.WriteHeader(http.StatusUnauthorized)
-		return
-	}
-	if r.URL.Path == "/" {
-		s.handleRead(w, r)
-		return
-	}
-	if r.URL.Path == "/info" {
-		s.handleInfo(w, r)
-		return
-	}
-	w.WriteHeader(http.StatusBadRequest)
-}
-
 func (s *Webserver) handleRead(w http.ResponseWriter, r *http.Request) {
+	if !s.isAuthedForReading(r) {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
 	offset := 0
 	offsetStr := r.URL.Query().Get("offset")
 	if offsetStr != "" {
@@ -80,11 +43,11 @@ func (s *Webserver) handleRead(w http.ResponseWriter, r *http.Request) {
 	fnQ := r.URL.Query().Get("fn")
 	results := make([]*msg.Msg, 0)
 	pages := 0
-	bufSize := int(buf.Size())
+	bufSize := int(s.Buf.Size())
 	offset32 := uint32(offset)
 	limit32 := uint32(limit)
 	for len(results) < int(limit) && pages*limit < bufSize/10 {
-		items := buf.Read(offset32, limit32)
+		items := s.Buf.Read(offset32, limit32)
 		pages++
 		offset += limit
 		e := &msg.Msg{}
@@ -109,19 +72,6 @@ func (s *Webserver) handleRead(w http.ResponseWriter, r *http.Request) {
 	data, err := json.Marshal(results)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to marshal data: %s", err), http.StatusInternalServerError)
-		return
-	}
-	w.Header().Set("content-type", "application/json")
-	w.Write(data)
-}
-
-func (s *Webserver) handleInfo(w http.ResponseWriter, r *http.Request) {
-	data, err := json.Marshal(&Info{
-		Writes:  buf.Writes.Load(),
-		Started: started.UnixMilli(),
-	})
-	if err != nil {
-		http.Error(w, fmt.Sprintf("failed to marshal info: %s", err), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("content-type", "application/json")

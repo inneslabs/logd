@@ -15,10 +15,7 @@
         "HTTP_LADDR": ":6101",
         "UDP_LADDR": ":6102",
         "READ_SECRET": "reader",
-        "WRITE_SECRET": "writer",
-        "TAIL_FOR_TESTING": "yes",
-        "TEST_TAIL_HOSTNAME": "logd.fly.dev",
-        "TEST_TAIL_READ_SECRET": "secret"
+        "WRITE_SECRET": "writer"
       }
     }
   ]
