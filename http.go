@@ -71,8 +71,8 @@ func (s *Webserver) handleRead(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "limit must be an integer", http.StatusBadRequest)
 			return
 		}
-		if limit > 10000 {
-			limit = 10000
+		if limit > 1000 {
+			limit = 1000
 		}
 	}
 	envQ := r.URL.Query().Get("env")
