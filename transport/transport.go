@@ -91,9 +91,8 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 					fmt.Printf("%s unauthorised: %s\r\n", raddr.IP.String(), err)
 					continue
 				}
-				// if tailing, first msg is "tail"
 				if string(payload) == "tail" {
-					go t.handleTailer(raddr)
+					go t.handleTailer(conn, raddr)
 					continue
 				}
 				if string(payload) == "ping" {
@@ -111,13 +110,25 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 	}
 }
 
-func (t *Transporter) handleTailer(raddr *net.UDPAddr) {
+func (t *Transporter) handleTailer(conn *net.UDPConn, raddr *net.UDPAddr) {
 	t.mu.Lock()
 	t.subs[raddr.AddrPort().String()] = &Sub{
 		raddr:    raddr,
 		lastPing: time.Now(),
 	}
 	t.mu.Unlock()
+	// notify sub directly
+	payload, err := pack.PackMsg(&msg.Msg{
+		Fn:  "logd",
+		Msg: "tailing logs...",
+	})
+	if err != nil {
+		fmt.Println("pack msg err:", err)
+	}
+	_, err = conn.WriteToUDP(payload, raddr)
+	if err != nil {
+		fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
+	}
 }
 
 func (t *Transporter) handlePing(raddr *net.UDPAddr) {
