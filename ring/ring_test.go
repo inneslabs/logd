@@ -34,7 +34,7 @@ func TestOffset(t *testing.T) {
 }
 
 func testWriteAndReadWithOffset(size, nWrites, offset int) bool {
-	r := NewRingBuffer(size)
+	r := NewRingBuffer(uint32(size))
 	writes := make([][]byte, 0)
 	for i := 0; i < nWrites; i++ {
 		buf := make([]byte, 32)
@@ -42,7 +42,7 @@ func testWriteAndReadWithOffset(size, nWrites, offset int) bool {
 		writes = append(writes, buf)
 		r.Write(&buf)
 	}
-	items := r.Read(offset, nWrites)
+	items := r.Read(uint32(offset), uint32(nWrites))
 	equal := true
 	for i := 0; i < size; i++ {
 		a := items[i]
@@ -56,7 +56,7 @@ func testWriteAndReadWithOffset(size, nWrites, offset int) bool {
 }
 
 func testWriteAndRead(size, nWrites int) bool {
-	r := NewRingBuffer(size)
+	r := NewRingBuffer(uint32(size))
 	writes := make([][]byte, 0)
 	for i := 0; i < nWrites; i++ {
 		buf := make([]byte, 32)
@@ -64,7 +64,7 @@ func testWriteAndRead(size, nWrites int) bool {
 		writes = append(writes, buf)
 		r.Write(&buf)
 	}
-	items := r.Read(0, nWrites)
+	items := r.Read(0, uint32(nWrites))
 	equal := true
 	for i := 0; i < size; i++ {
 		a := items[i]

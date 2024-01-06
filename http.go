@@ -80,8 +80,11 @@ func (s *Webserver) handleRead(w http.ResponseWriter, r *http.Request) {
 	fnQ := r.URL.Query().Get("fn")
 	results := make([]*msg.Msg, 0)
 	pages := 0
-	for len(results) < limit && pages*limit < buf.Size()/10 {
-		items := buf.Read(offset, limit)
+	bufSize := int(buf.Size())
+	offset32 := uint32(offset)
+	limit32 := uint32(limit)
+	for len(results) < int(limit) && pages*limit < bufSize/10 {
+		items := buf.Read(offset32, limit32)
 		pages++
 		offset += limit
 		e := &msg.Msg{}

@@ -25,3 +25,9 @@ func UnpackSignedMsg(msg []byte) (sum, timeBytes, payload []byte, err error) {
 func PackMsg(msg *msg.Msg) ([]byte, error) {
 	return cbor.Marshal(msg)
 }
+
+func UnpackMsg(data []byte) (*msg.Msg, error) {
+	m := &msg.Msg{}
+	err := cbor.Unmarshal(data, m)
+	return m, err
+}

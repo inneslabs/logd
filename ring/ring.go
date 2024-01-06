@@ -1,16 +1,23 @@
 package ring
 
-import "sync/atomic"
+import (
+	"sync/atomic"
+)
 
 type RingBuffer struct {
-	head   int
-	size   int
+	head   atomic.Uint32
+	size   uint32
 	values []*[]byte
 	Writes atomic.Uint64
 }
 
+const (
+	zero = uint32(0)
+	one  = uint64(1)
+)
+
 // NewRingBuffer returns a pointer to a new RingBuffer of given size
-func NewRingBuffer(size int) *RingBuffer {
+func NewRingBuffer(size uint32) *RingBuffer {
 	r := &RingBuffer{
 		size:   size,
 		values: make([]*[]byte, size),
@@ -18,32 +25,34 @@ func NewRingBuffer(size int) *RingBuffer {
 	return r
 }
 
-func (r *RingBuffer) Size() int {
+func (r *RingBuffer) Size() uint32 {
 	return r.size
 }
 
 func (r *RingBuffer) Write(data *[]byte) {
-	r.Writes.Add(uint64(1))
-	r.values[r.head] = data
-	r.head = (r.head + 1) % r.size
+	r.Writes.Add(one)
+	head := r.head.Load()
+	r.values[head] = data
+	r.head.Store((head + 1) % r.size)
 }
 
 // Read returns limit of data
-func (r *RingBuffer) Read(offset, limit int) []*[]byte {
-	if limit > r.size || limit < 0 {
+func (r *RingBuffer) Read(offset, limit uint32) []*[]byte {
+	if limit > r.size || limit < zero {
 		limit = r.size
 	}
 	output := make([]*[]byte, 0)
-	reads := 0
-	index := (r.head + (r.size - 1) + offset) % r.size
+	reads := zero
+	head := r.head.Load()
+	index := (head + (r.size - 1) + offset) % r.size
 	for reads < limit {
 		if r.values[index] != nil {
 			output = append(output, r.values[index])
 		}
-		index--
-		if index < 0 {
-			index = r.size - 1
+		if index == zero {
+			index = r.size
 		}
+		index--
 		reads++
 	}
 	return output

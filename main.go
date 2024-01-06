@@ -13,22 +13,27 @@ import (
 	"github.com/swissinfo-ch/logd/transport"
 )
 
+const readRoutines = 10
+
 var (
-	buf         *ring.RingBuffer
-	readSecret  []byte
-	writeSecret []byte
-	started     time.Time
+	buf                *ring.RingBuffer
+	readSecret         []byte
+	writeSecret        []byte
+	started            time.Time
+	willTailForTesting bool
 )
 
 func init() {
-	bufferSize, err := strconv.Atoi(os.Getenv("BUFFER_SIZE"))
+	bufferSize, err := strconv.ParseUint(os.Getenv("BUFFER_SIZE"), 10, 32)
 	if err != nil {
 		panic("BUFFER_SIZE must be an integer")
 	}
-	buf = ring.NewRingBuffer(bufferSize)
+	buf = ring.NewRingBuffer(uint32(bufferSize))
+	fmt.Println("initialised buffer of size", bufferSize)
 	readSecret = []byte(os.Getenv("READ_SECRET"))
 	writeSecret = []byte(os.Getenv("WRITE_SECRET"))
 	started = time.Now()
+	willTailForTesting = os.Getenv("TAIL_FOR_TESTING") != ""
 }
 
 func main() {
@@ -40,7 +45,9 @@ func main() {
 	t := transport.NewTransporter()
 	t.SetReadSecret(readSecret)
 	t.SetWriteSecret(writeSecret)
-	go readIn(ctx, t)
+	for i := 0; i < readRoutines; i++ {
+		go readIn(ctx, t)
+	}
 	go t.Listen(ctx, os.Getenv("UDP_LADDR"))
 
 	h := &Webserver{}
@@ -50,17 +57,10 @@ func main() {
 	fmt.Println("all routines ended")
 }
 
-func cancelOnSig(sigs chan os.Signal, cancel context.CancelFunc) {
-	switch <-sigs {
-	case syscall.SIGINT:
-		fmt.Println("\r\nreceived SIGINT")
-	case syscall.SIGTERM:
-		fmt.Println("\r\nreceived SIGTERM")
-	}
-	cancel()
-}
-
 func readIn(ctx context.Context, t *transport.Transporter) {
+	if willTailForTesting {
+		go tailForTesting(t)
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -68,6 +68,7 @@ func readIn(ctx context.Context, t *transport.Transporter) {
 		case msg := <-t.In:
 			t.Out <- msg
 			buf.Write(msg)
+			// alarmSvc.In <- msg
 		}
 	}
 }
