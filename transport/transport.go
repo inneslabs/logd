@@ -24,8 +24,8 @@ type Sub struct {
 }
 
 type Transporter struct {
-	In          chan []byte
-	Out         chan []byte
+	In          chan *[]byte
+	Out         chan *[]byte
 	subs        map[string]*Sub
 	mu          sync.Mutex
 	readSecret  []byte
@@ -34,8 +34,8 @@ type Transporter struct {
 
 func NewTransporter() *Transporter {
 	return &Transporter{
-		In:   make(chan []byte),
-		Out:  make(chan []byte, 10),
+		In:   make(chan *[]byte, 50),
+		Out:  make(chan *[]byte, 50),
 		subs: make(map[string]*Sub),
 		mu:   sync.Mutex{},
 	}
@@ -105,7 +105,7 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 				fmt.Printf("%s unauthorised: %s\r\n", raddr.IP.String(), err)
 				continue
 			}
-			t.In <- payload
+			t.In <- &payload
 		}
 	}
 }
@@ -151,8 +151,8 @@ func (t *Transporter) writeToConn(ctx context.Context, conn *net.UDPConn) {
 					t.kickSub(conn, sub, raddr)
 					continue
 				}
-				go func(msg []byte, sub *Sub, raddr string) {
-					_, err := conn.WriteToUDP(msg, sub.raddr)
+				go func(msg *[]byte, sub *Sub, raddr string) {
+					_, err := conn.WriteToUDP(*msg, sub.raddr)
 					if err != nil {
 						fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
 					}
@@ -191,6 +191,6 @@ func (t *Transporter) broadcast(m string) error {
 	if err != nil {
 		return fmt.Errorf("pack msg err: %w", err)
 	}
-	t.Out <- payload
+	t.Out <- &payload
 	return nil
 }

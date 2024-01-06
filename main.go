@@ -67,7 +67,7 @@ func readIn(ctx context.Context, t *transport.Transporter) {
 			return
 		case msg := <-t.In:
 			t.Out <- msg
-			buf.Write(&msg)
+			buf.Write(msg)
 		}
 	}
 }
