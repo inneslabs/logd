@@ -5,14 +5,27 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 )
 
 const (
-	timeLen       = 8
-	hashLen       = 32
-	timeThreshold = time.Millisecond * 1000
+	timeLen = 8
+	hashLen = 32
 )
+
+var sigTtl = time.Millisecond * 200
+
+func init() {
+	sigTtlStr := os.Getenv("SIG_TTL")
+	if sigTtlStr != "" {
+		var err error
+		sigTtl, err = time.ParseDuration(sigTtlStr)
+		if err != nil {
+			panic("sig ttl parse err: " + err.Error())
+		}
+	}
+}
 
 func Sign(secret, payload []byte, t time.Time) ([]byte, error) {
 	timeBytes, err := convertTimeToBytes(t)
@@ -36,8 +49,8 @@ func Verify(secret, sum, timeBytes, payload []byte) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("convert bytes to time err: %w", err)
 	}
-	if t.After(time.Now().Add(timeThreshold)) ||
-		t.Before(time.Now().Add(-timeThreshold)) {
+	if t.After(time.Now().Add(sigTtl)) ||
+		t.Before(time.Now().Add(-sigTtl)) {
 		return false, errors.New("time is outside of threshold")
 	}
 	data := append(secret, timeBytes...)

@@ -13,6 +13,7 @@ primary_region = "ams"
   BUFFER_SIZE = "100000"
   HTTP_LADDR = ":6101"
   UDP_LADDR = "fly-global-services:6102"
+  SIG_TTL = "500ms"
 
 [[services]]
   protocol = "tcp"
