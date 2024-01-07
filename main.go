@@ -18,20 +18,22 @@ import (
 const readRoutines = 10
 
 var (
-	buf         *ring.RingBuffer
-	readSecret  []byte
-	writeSecret []byte
+	buf           *ring.RingBuffer
+	bufferSizeStr = os.Getenv("BUFFER_SIZE")
+	httpLaddr     = os.Getenv("HTTP_LADDR")
+	udpLaddr      = os.Getenv("UDP_LADDR")
+	readSecret    = []byte(os.Getenv("READ_SECRET"))
+	writeSecret   = []byte(os.Getenv("WRITE_SECRET"))
+	slackWebhook  = os.Getenv("SLACK_WEBHOOK")
 )
 
 func init() {
-	bufferSize, err := strconv.ParseUint(os.Getenv("BUFFER_SIZE"), 10, 32)
+	bufferSize, err := strconv.ParseUint(bufferSizeStr, 10, 32)
 	if err != nil {
 		panic("BUFFER_SIZE must be an integer")
 	}
 	buf = ring.NewRingBuffer(uint32(bufferSize))
 	fmt.Println("initialised buffer of size", bufferSize)
-	readSecret = []byte(os.Getenv("READ_SECRET"))
-	writeSecret = []byte(os.Getenv("WRITE_SECRET"))
 }
 
 func main() {
@@ -45,12 +47,12 @@ func main() {
 		Buf:        buf,
 		Started:    time.Now(),
 	}
-	go h.ServeHttp(os.Getenv("HTTP_LADDR"))
+	go h.ServeHttp(httpLaddr)
 
 	t := transport.NewTransporter()
 	t.SetReadSecret(readSecret)
 	t.SetWriteSecret(writeSecret)
-	go t.Listen(ctx, os.Getenv("UDP_LADDR"))
+	go t.Listen(ctx, udpLaddr)
 
 	a := alarm.NewSvc()
 	a.Set(prodWpErrors())

@@ -5,27 +5,14 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"os"
 	"time"
 )
 
 const (
 	timeLen = 8
 	hashLen = 32
+	sigTtl  = time.Millisecond * 500
 )
-
-var sigTtl = time.Millisecond * 200
-
-func init() {
-	sigTtlStr := os.Getenv("SIG_TTL")
-	if sigTtlStr != "" {
-		var err error
-		sigTtl, err = time.ParseDuration(sigTtlStr)
-		if err != nil {
-			panic("sig ttl parse err: " + err.Error())
-		}
-	}
-}
 
 func Sign(secret, payload []byte, t time.Time) ([]byte, error) {
 	timeBytes, err := convertTimeToBytes(t)

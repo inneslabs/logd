@@ -40,7 +40,7 @@ func TestSignAndVerifyInvalid(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	signedMsg, err := Sign(sec, payload, time.Now().Add(sigTtl*2))
+	signedMsg, err := Sign(sec, payload, time.Now().Add(time.Second))
 	if err != nil {
 		t.FailNow()
 	}

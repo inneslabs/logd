@@ -3,7 +3,6 @@ package log
 import (
 	"fmt"
 	"net"
-	"os"
 	"time"
 
 	"github.com/swissinfo-ch/logd/auth"
@@ -30,7 +29,7 @@ type Logger struct {
 	Fn     string
 }
 
-func NewLogger(host string, writeSecret []byte) (*Logger, error) {
+func NewLogger(host, env, svc, fn string, writeSecret []byte) (*Logger, error) {
 	addr, err := conn.GetAddr(host)
 	if err != nil {
 		return nil, fmt.Errorf("get addr err: %w", err)
@@ -42,9 +41,9 @@ func NewLogger(host string, writeSecret []byte) (*Logger, error) {
 	return &Logger{
 		Conn:   c,
 		Secret: writeSecret,
-		Env:    os.Getenv("SWI_ENV"),
-		Svc:    os.Getenv("SWI_SVC"),
-		Fn:     os.Getenv("SWI_FN"),
+		Env:    env,
+		Svc:    svc,
+		Fn:     fn,
 	}, nil
 }
 

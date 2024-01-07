@@ -5,18 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
-)
-
-var (
-	slackWebhook = os.Getenv("SLACK_WEBHOOK")
 )
 
 type SlackMsg struct {
 	Text string `json:"text"`
 }
 
-func SendSlackMsg(msg string) error {
+func SendSlackMsg(msg, slackWebhook string) error {
 	buf := &bytes.Buffer{}
 	enc := json.NewEncoder(buf)
 	err := enc.Encode(&SlackMsg{
