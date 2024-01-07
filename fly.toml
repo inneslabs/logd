@@ -13,7 +13,7 @@ primary_region = "ams"
   BUFFER_SIZE = "25000"
   HTTP_LADDR = ":6101"
   UDP_LADDR = "fly-global-services:6102"
-  SIG_TTL = "500ms"
+  SIG_TTL = "1s"
   
   # use fly secrets for:
   # READ_SECRET
