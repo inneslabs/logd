@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/swissinfo-ch/logd/alarm"
 	"github.com/swissinfo-ch/logd/ring"
 	"github.com/swissinfo-ch/logd/transport"
 	"github.com/swissinfo-ch/logd/web"
@@ -39,14 +40,6 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	go cancelOnSig(sigs, cancel)
 
-	t := transport.NewTransporter()
-	t.SetReadSecret(readSecret)
-	t.SetWriteSecret(writeSecret)
-	for i := 0; i < readRoutines; i++ {
-		go readIn(ctx, t)
-	}
-	go t.Listen(ctx, os.Getenv("UDP_LADDR"))
-
 	h := &web.Webserver{
 		ReadSecret: string(readSecret),
 		Buf:        buf,
@@ -54,11 +47,24 @@ func main() {
 	}
 	go h.ServeHttp(os.Getenv("HTTP_LADDR"))
 
+	t := transport.NewTransporter()
+	t.SetReadSecret(readSecret)
+	t.SetWriteSecret(writeSecret)
+	go t.Listen(ctx, os.Getenv("UDP_LADDR"))
+
+	a := alarm.NewSvc()
+	a.Set(prodWpErrors())
+	a.Set(prodWarnings())
+
+	for i := 0; i < readRoutines; i++ {
+		go readIn(ctx, t, a)
+	}
+
 	<-ctx.Done()
 	fmt.Println("all routines ended")
 }
 
-func readIn(ctx context.Context, t *transport.Transporter) {
+func readIn(ctx context.Context, t *transport.Transporter, a *alarm.Svc) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -66,6 +72,7 @@ func readIn(ctx context.Context, t *transport.Transporter) {
 		case msg := <-t.In:
 			t.Out <- msg
 			buf.Write(msg)
+			a.In <- msg
 		}
 	}
 }

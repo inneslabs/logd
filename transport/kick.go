@@ -38,6 +38,7 @@ func (t *Transporter) kickSub(conn *net.UDPConn, sub *Sub, raddr string) {
 	})
 	if err != nil {
 		fmt.Println("pack msg err:", err)
+		return
 	}
 	_, err = conn.WriteToUDP(payload, sub.raddr)
 	if err != nil {

@@ -37,7 +37,7 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 					continue
 				}
 				if string(payload) == "tail" {
-					go t.handleTailer(conn, raddr)
+					go t.handleTail(conn, raddr)
 					continue
 				}
 				if string(payload) == "ping" {
@@ -55,7 +55,7 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 	}
 }
 
-func (t *Transporter) handleTailer(conn *net.UDPConn, raddr *net.UDPAddr) {
+func (t *Transporter) handleTail(conn *net.UDPConn, raddr *net.UDPAddr) {
 	t.mu.Lock()
 	t.subs[raddr.AddrPort().String()] = &Sub{
 		raddr:    raddr,
@@ -68,11 +68,14 @@ func (t *Transporter) handleTailer(conn *net.UDPConn, raddr *net.UDPAddr) {
 	})
 	if err != nil {
 		fmt.Println("pack msg err:", err)
+		return
 	}
 	_, err = conn.WriteToUDP(payload, raddr)
 	if err != nil {
 		fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
+		return
 	}
+	fmt.Println("got new tail", raddr.AddrPort().String())
 }
 
 func (t *Transporter) handlePing(raddr *net.UDPAddr) {
