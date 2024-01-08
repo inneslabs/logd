@@ -96,6 +96,9 @@ func (s *Svc) kickOldEvents() {
 
 func (s *Svc) callActions() {
 	for a := range s.triggered {
+		if a.LastTriggered.After(time.Now().Add(-a.Period)) {
+			return
+		}
 		fmt.Println("alarm triggered:", a.Name)
 		err := a.Action()
 		if err != nil {
