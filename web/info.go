@@ -102,7 +102,7 @@ func (s *Webserver) measureInfo() {
 				TimeLastTriggered: a.LastTriggered.UnixMilli(),
 			})
 		}
-		time.Sleep(time.Second)
+		time.Sleep(time.Millisecond * 500)
 	}
 }
 
