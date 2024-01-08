@@ -42,23 +42,3 @@ func prodWpErrors() *alarm.Alarm {
 		},
 	}
 }
-
-func prodWarnings() *alarm.Alarm {
-	return &alarm.Alarm{
-		Name: "prod/warnings",
-		Match: func(m *msg.Msg) bool {
-			if m.Env != "prod" {
-				return false
-			}
-			if m.Lvl != "WARN" {
-				return false
-			}
-			return true
-		},
-		Period:    time.Minute * 10,
-		Threshold: 20,
-		Action: func() error {
-			return alarm.SendSlackMsg("⚠️ 20 warnings occurred on prod in the last 10 minutes.", slackWebhook)
-		},
-	}
-}

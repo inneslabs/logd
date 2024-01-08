@@ -56,7 +56,6 @@ func main() {
 
 	a := alarm.NewSvc()
 	a.Set(prodWpErrors())
-	a.Set(prodWarnings())
 
 	for i := 0; i < readRoutines; i++ {
 		go readIn(ctx, t, a)
