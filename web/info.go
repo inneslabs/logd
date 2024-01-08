@@ -71,10 +71,10 @@ func (s *Webserver) handleInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Webserver) measureInfo() {
-	memStats := &runtime.MemStats{}
-	runtime.ReadMemStats(memStats)
-
 	for {
+		memStats := &runtime.MemStats{}
+		runtime.ReadMemStats(memStats)
+
 		info = &Info{
 			TimeStarted: s.Started.UnixMilli(),
 			Machine: &MachineInfo{
