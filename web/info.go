@@ -23,7 +23,7 @@ type Info struct {
 
 type MachineInfo struct {
 	MemTotalMB float64 `json:"memTotalMB"`
-	MemUsedMB  float64 `json:"memUsedMB"`
+	MemAllocMB float64 `json:"memAllocMB"`
 }
 
 type BufferInfo struct {
@@ -78,7 +78,7 @@ func (s *Webserver) measureInfo() {
 		info = &Info{
 			TimeStarted: s.Started.UnixMilli(),
 			Machine: &MachineInfo{
-				MemUsedMB:  float64(memStats.TotalAlloc) / 1024 / 1024,
+				MemAllocMB: float64(memStats.Alloc) / 1024 / 1024,
 				MemTotalMB: totalMemory,
 			},
 			Buffer: &BufferInfo{
