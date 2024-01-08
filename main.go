@@ -47,6 +47,7 @@ func main() {
 
 	a := alarm.NewSvc()
 	a.Set(prodWpErrors())
+	a.Set(prodErrors())
 
 	h := &web.Webserver{
 		ReadSecret:  string(readSecret),

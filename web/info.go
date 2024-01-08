@@ -14,11 +14,11 @@ import (
 )
 
 type Info struct {
-	TimeStarted int64          `json:"timeStarted"`
-	Machine     *MachineInfo   `json:"machine"`
-	Buffer      *BufferInfo    `json:"buffer"`
-	Transport   *TransportInfo `json:"transport"`
-	Alarms      []*AlarmStatus `json:"alarms"`
+	Uptime    time.Duration  `json:"uptime"`
+	Machine   *MachineInfo   `json:"machine"`
+	Buffer    *BufferInfo    `json:"buffer"`
+	Transport *TransportInfo `json:"transport"`
+	Alarms    []*AlarmStatus `json:"alarms"`
 }
 
 type MachineInfo struct {
@@ -75,9 +75,8 @@ func (s *Webserver) measureInfo() {
 	for {
 		memStats := &runtime.MemStats{}
 		runtime.ReadMemStats(memStats)
-
 		info = &Info{
-			TimeStarted: s.Started.UnixMilli(),
+			Uptime: time.Since(s.Started),
 			Machine: &MachineInfo{
 				MemAllocMB: float64(memStats.Alloc) / 1024 / 1024,
 				MemTotalMB: totalMemory,
@@ -92,7 +91,6 @@ func (s *Webserver) measureInfo() {
 			},
 			Alarms: make([]*AlarmStatus, 0),
 		}
-
 		for _, a := range s.AlarmSvc.Alarms {
 			info.Alarms = append(info.Alarms, &AlarmStatus{
 				Name:              a.Name,
@@ -112,7 +110,6 @@ func readTotalMemory() (float64, error) {
 		return 0, fmt.Errorf("error opening meminfo: %w", err)
 	}
 	defer file.Close()
-
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
