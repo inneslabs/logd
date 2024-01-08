@@ -28,6 +28,7 @@ type MachineInfo struct {
 
 type BufferInfo struct {
 	Writes uint64 `json:"writes"`
+	Size   uint32 `json:"size"`
 }
 
 type TransportInfo struct {
@@ -83,6 +84,7 @@ func (s *Webserver) measureInfo() {
 			},
 			Buffer: &BufferInfo{
 				Writes: s.Buf.Writes.Load(),
+				Size:   s.Buf.Size(),
 			},
 			Transport: &TransportInfo{
 				LenInChan:  len(s.Transporter.In),
