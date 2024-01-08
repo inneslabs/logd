@@ -69,6 +69,9 @@ func (s *Svc) matchMsgs() {
 				Occurred: time.Now(),
 			}
 			if len(al.Events) >= al.Threshold {
+				if al.LastTriggered.After(time.Now().Add(-al.Period)) {
+					continue
+				}
 				s.triggered <- al
 				al.mu.Lock()
 				al.Events = make(map[int64]*Event)
@@ -96,9 +99,6 @@ func (s *Svc) kickOldEvents() {
 
 func (s *Svc) callActions() {
 	for a := range s.triggered {
-		if a.LastTriggered.After(time.Now().Add(-a.Period)) {
-			return
-		}
 		fmt.Println("alarm triggered:", a.Name)
 		err := a.Action()
 		if err != nil {
