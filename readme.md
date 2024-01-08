@@ -1,7 +1,7 @@
 # Logd
 ## Logs for your apps in constant time and constant space with ultra-low latency.
 A non-blocking circular buffer to store millions of logs per hour.
-![A circular buffer](./doc/circular_buffer.svg)
+![A circular buffer](.doc/circular_buffer.svg)
 
 # Logd is a circular buffer
 Logd (pronounced "logged") will never run out of storage. Reads & writes are constant time.
