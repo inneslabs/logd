@@ -7,21 +7,21 @@ import (
 	"strings"
 	"time"
 
+	"github.com/swissinfo-ch/logd/alarm"
 	"github.com/swissinfo-ch/logd/ring"
+	"github.com/swissinfo-ch/logd/transport"
 )
 
 type Webserver struct {
-	ReadSecret string
-	Buf        *ring.RingBuffer
-	Started    time.Time
-}
-
-type Info struct {
-	Writes  uint64 `json:"writes"`
-	Started int64  `json:"started"`
+	ReadSecret  string
+	Buf         *ring.RingBuffer
+	Transporter *transport.Transporter
+	AlarmSvc    *alarm.Svc
+	Started     time.Time
 }
 
 func (s *Webserver) ServeHttp(laddr string) {
+	go s.measureInfo()
 	http.Handle("/", http.HandlerFunc(s.handleRequest))
 	fmt.Println("listening http on " + laddr)
 	err := http.ListenAndServe(laddr, nil)

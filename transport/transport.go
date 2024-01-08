@@ -8,7 +8,10 @@ import (
 	"time"
 )
 
-const bufferSize = 2048
+const (
+	ChanBufferSize   = 50 // payloads to buffer throughout logd
+	socketBufferSize = 2048
+)
 
 type Sub struct {
 	raddr    *net.UDPAddr
@@ -24,12 +27,14 @@ type Transporter struct {
 	writeSecret []byte
 }
 
-func NewTransporter() *Transporter {
+func NewTransporter(readSecret, writeSecret []byte) *Transporter {
 	return &Transporter{
-		In:   make(chan *[]byte, 50),
-		Out:  make(chan *[]byte, 50),
-		subs: make(map[string]*Sub),
-		mu:   sync.Mutex{},
+		In:          make(chan *[]byte, ChanBufferSize),
+		Out:         make(chan *[]byte, ChanBufferSize),
+		subs:        make(map[string]*Sub),
+		mu:          sync.Mutex{},
+		readSecret:  readSecret,
+		writeSecret: writeSecret,
 	}
 }
 

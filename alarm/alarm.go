@@ -7,23 +7,25 @@ import (
 
 	"github.com/swissinfo-ch/logd/msg"
 	"github.com/swissinfo-ch/logd/pack"
+	"github.com/swissinfo-ch/logd/transport"
 )
 
 type Svc struct {
 	In        chan *[]byte
-	alarms    map[string]*Alarm
+	Alarms    map[string]*Alarm
 	triggered chan *Alarm
 	mu        sync.Mutex
 }
 
 type Alarm struct {
-	Name      string
-	Match     func(*msg.Msg) bool
-	Period    time.Duration // period of analysis
-	Threshold int
-	Events    map[int64]*Event // key is unix milli
-	Action    func() error
-	mu        sync.Mutex
+	Name          string
+	Match         func(*msg.Msg) bool
+	Period        time.Duration // period of analysis
+	Threshold     int
+	Events        map[int64]*Event // key is unix milli
+	Action        func() error
+	LastTriggered time.Time
+	mu            sync.Mutex
 }
 
 type Event struct {
@@ -33,9 +35,9 @@ type Event struct {
 
 func NewSvc() *Svc {
 	s := &Svc{
-		alarms:    make(map[string]*Alarm),
+		In:        make(chan *[]byte, transport.ChanBufferSize),
+		Alarms:    make(map[string]*Alarm),
 		triggered: make(chan *Alarm),
-		In:        make(chan *[]byte, 50),
 	}
 	go s.matchMsgs()
 	go s.kickOldEvents()
@@ -45,8 +47,8 @@ func NewSvc() *Svc {
 
 func (s *Svc) Set(al *Alarm) {
 	s.mu.Lock()
-	s.alarms[al.Name] = al
-	s.alarms[al.Name].Events = make(map[int64]*Event)
+	s.Alarms[al.Name] = al
+	s.Alarms[al.Name].Events = make(map[int64]*Event)
 	s.mu.Unlock()
 	fmt.Println("set alarm:", al.Name)
 }
@@ -57,7 +59,7 @@ func (s *Svc) matchMsgs() {
 		if err != nil {
 			fmt.Println("alarm unpack msg err:", err)
 		}
-		for _, al := range s.alarms {
+		for _, al := range s.Alarms {
 			if !al.Match(m) {
 				continue
 			}
@@ -70,6 +72,7 @@ func (s *Svc) matchMsgs() {
 				s.triggered <- al
 				al.mu.Lock()
 				al.Events = make(map[int64]*Event)
+				al.LastTriggered = time.Now()
 				al.mu.Unlock()
 			}
 		}
@@ -78,7 +81,7 @@ func (s *Svc) matchMsgs() {
 
 func (s *Svc) kickOldEvents() {
 	for {
-		for _, al := range s.alarms {
+		for _, al := range s.Alarms {
 			for i, ev := range al.Events {
 				if ev.Occurred.Before(time.Now().Add(-al.Period)) {
 					al.mu.Lock()

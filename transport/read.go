@@ -18,7 +18,7 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 		case <-ctx.Done():
 			return
 		default:
-			buf = make([]byte, bufferSize)
+			buf = make([]byte, socketBufferSize)
 			conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 			n, raddr, err := conn.ReadFromUDP(buf)
 			if err != nil {
