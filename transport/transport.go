@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	ChanBufferSize   = 50 // payloads to buffer throughout logd
+	ChanBufferSize   = 10 // payloads to buffer throughout logd
 	socketBufferSize = 2048
 )
 
