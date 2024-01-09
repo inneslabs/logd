@@ -17,7 +17,7 @@ func tailLogd(t *transport.Transporter, tailHost, tailReadSecret string) {
 		fmt.Println("failed to get addr:", err)
 		return
 	}
-	c, err := conn.GetConn(addr)
+	c, err := conn.Dial(addr)
 	if err != nil {
 		fmt.Println("failed to get conn:", err)
 		return

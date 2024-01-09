@@ -22,19 +22,41 @@ curl --location "$LOGD_HOST/?limit=10" \
 ```
 
 # UDP
+## Logger
+The simplest way to write logs is using the `log` package.
+```go
+l, _ := log.NewLogger(&log.LoggerConfig{
+  Host:        "logd.fly.dev",
+  WriteSecret: "the-secret",
+  Env:         "prod",
+  Svc:         "example-service",
+  Fn:          "Readme",
+})
+l.Log(log.Info, "this is an example %s", "log message")
+```
+
+## Custom integration
 Logs are written by connecting to a UDP socket on port `:6102`.
 ```go
 // error checks skipped for brevity
-conn, _ := logdutil.GetConn(nil) // will use LOGD_HOST by default
-data, _ := cbor.Marshal(&logdentry.Entry{
-  Timestamp:  timestamp.UnixMilli(),
-  Env:        env,
-  Svc:        msg.Svc,
-  Fn:         msg.Fn,
-  Lvl:        strings.ToUpper(msg.Lvl),
-  Msg:        msg.Msg,
-  StackTrace: msg.StackTrace,
+
+// dial udp
+addr, _ := conn.GetAddr("logd.fly.dev")
+conn, _ := conn.Dial(addr)
+
+// serialise message
+payload, _ := pack.PackMsg(&msg.Msg{
+  Timestamp: time.Now().UnixNano(),
+  Env:       l.Env,
+  Svc:       l.Svc,
+  Fn:        l.Fn,
+  Lvl:       string(lvl),
+  Msg:       fmt.Sprintf(template, args...),
 })
-authedMsg, _ := logdutil.AuthMsg(logdWriteSecret, data)
-conn.Write(authedMsg)
+
+// get ephemeral signature using current time
+signedMsg, _ := auth.Sign(l.Secret, payload, time.Now())
+
+// write to socket
+l.Conn.Write(signedMsg)
 ```

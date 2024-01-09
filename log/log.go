@@ -22,28 +22,36 @@ const (
 type Lvl string
 
 type Logger struct {
-	Conn   net.Conn
-	Secret []byte
-	Env    string
-	Svc    string
-	Fn     string
+	conn   net.Conn
+	secret []byte
+	env    string
+	svc    string
+	fn     string
 }
 
-func NewLogger(host, env, svc, fn string, writeSecret []byte) (*Logger, error) {
-	addr, err := conn.GetAddr(host)
+type LoggerConfig struct {
+	Host        string
+	WriteSecret string
+	Env         string
+	Svc         string
+	Fn          string
+}
+
+func NewLogger(cfg *LoggerConfig) (*Logger, error) {
+	addr, err := conn.GetAddr(cfg.Host)
 	if err != nil {
 		return nil, fmt.Errorf("get addr err: %w", err)
 	}
-	c, err := conn.GetConn(addr)
+	c, err := conn.Dial(addr)
 	if err != nil {
 		return nil, fmt.Errorf("get conn err: %w", err)
 	}
 	return &Logger{
-		Conn:   c,
-		Secret: writeSecret,
-		Env:    env,
-		Svc:    svc,
-		Fn:     fn,
+		conn:   c,
+		secret: []byte(cfg.WriteSecret),
+		env:    cfg.Env,
+		svc:    cfg.Svc,
+		fn:     cfg.Fn,
 	}, nil
 }
 
@@ -52,9 +60,9 @@ func (l *Logger) Log(lvl Lvl, template string, args ...interface{}) {
 	// build msg
 	payload, err := pack.PackMsg(&msg.Msg{
 		Timestamp: time.Now().UnixNano(),
-		Env:       l.Env,
-		Svc:       l.Svc,
-		Fn:        l.Fn,
+		Env:       l.env,
+		Svc:       l.svc,
+		Fn:        l.fn,
 		Lvl:       string(lvl),
 		Msg:       fmt.Sprintf(template, args...),
 	})
@@ -64,14 +72,14 @@ func (l *Logger) Log(lvl Lvl, template string, args ...interface{}) {
 	}
 
 	// get ephemeral signature
-	signedMsg, err := auth.Sign(l.Secret, payload, time.Now())
+	signedMsg, err := auth.Sign(l.secret, payload, time.Now())
 	if err != nil {
 		fmt.Println("logd.log sign msg err:", err)
 		return
 	}
 
 	// write to socket
-	_, err = l.Conn.Write(signedMsg)
+	_, err = l.conn.Write(signedMsg)
 	if err != nil {
 		fmt.Println("logd.log write udp err:", err)
 	}
