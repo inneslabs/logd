@@ -5,14 +5,16 @@ import (
 	"time"
 
 	"github.com/swissinfo-ch/logd/msg"
-	"github.com/swissinfo-ch/logd/pack"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestSignAndVerify(t *testing.T) {
 	sec := []byte("testsecret")
-	payload, err := pack.PackMsg(&msg.Msg{
-		Timestamp: time.Now().UnixMilli(),
-		Msg:       "this is a test",
+	txt := "this is a test"
+	payload, err := proto.Marshal(&msg.Msg{
+		T:   timestamppb.Now(),
+		Txt: &txt,
 	})
 	if err != nil {
 		t.FailNow()
@@ -21,7 +23,7 @@ func TestSignAndVerify(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	sum, timeBytes, payload, err := pack.UnpackSignedMsg(signedMsg)
+	sum, timeBytes, payload, err := UnpackSignedMsg(signedMsg)
 	if err != nil {
 		t.FailNow()
 	}
@@ -33,9 +35,10 @@ func TestSignAndVerify(t *testing.T) {
 
 func TestSignAndVerifyInvalid(t *testing.T) {
 	sec := []byte("testsecret")
-	payload, err := pack.PackMsg(&msg.Msg{
-		Timestamp: time.Now().UnixMilli(),
-		Msg:       "this is a test",
+	txt := "this is a test"
+	payload, err := proto.Marshal(&msg.Msg{
+		T:   timestamppb.Now(),
+		Txt: &txt,
 	})
 	if err != nil {
 		t.FailNow()
@@ -44,7 +47,7 @@ func TestSignAndVerifyInvalid(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	sum, timeBytes, payload, err := pack.UnpackSignedMsg(signedMsg)
+	sum, timeBytes, payload, err := UnpackSignedMsg(signedMsg)
 	if err != nil {
 		t.FailNow()
 	}

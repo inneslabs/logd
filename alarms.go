@@ -1,13 +1,10 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
-	"github.com/fxamacker/cbor/v2"
 	"github.com/swissinfo-ch/logd/alarm"
 	"github.com/swissinfo-ch/logd/msg"
-	"github.com/swissinfo-ch/logd/wp"
 )
 
 func prodWpErrors() *alarm.Alarm {
@@ -17,20 +14,13 @@ func prodWpErrors() *alarm.Alarm {
 			if m.Env != "prod" {
 				return false
 			}
-			if m.Lvl != "ERROR" {
+			if m.Svc != "wp" {
 				return false
 			}
-			reqData, ok := m.Dump.([]byte)
-			if !ok {
-				fmt.Printf("dump is not a []byte, it is type %T\r\n", m.Dump)
+			if m.ResponseStatus == nil {
 				return false
 			}
-			req := &wp.Request{}
-			err := cbor.Unmarshal(reqData, req)
-			if err != nil {
-				fmt.Println("failed to unmarshal dump:", err)
-			}
-			if req.ResponseStatus == "200" {
+			if *m.ResponseStatus != 200 {
 				return false
 			}
 			return true
@@ -50,7 +40,10 @@ func prodErrors() *alarm.Alarm {
 			if m.Env != "prod" {
 				return false
 			}
-			if m.Lvl != "ERROR" {
+			if m.Lvl == nil {
+				return false
+			}
+			if *m.Lvl != msg.Lvl_ERROR {
 				return false
 			}
 			return true

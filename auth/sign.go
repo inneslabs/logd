@@ -9,9 +9,10 @@ import (
 )
 
 const (
-	timeLen = 8
 	hashLen = 32
 	sigTtl  = time.Millisecond * 500
+	sumLen  = 32
+	timeLen = 8
 )
 
 func Sign(secret, payload []byte, t time.Time) ([]byte, error) {

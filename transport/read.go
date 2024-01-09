@@ -8,7 +8,7 @@ import (
 
 	"github.com/swissinfo-ch/logd/auth"
 	"github.com/swissinfo-ch/logd/msg"
-	"github.com/swissinfo-ch/logd/pack"
+	"google.golang.org/protobuf/proto"
 )
 
 func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
@@ -24,7 +24,7 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 			if err != nil {
 				continue
 			}
-			sum, timeBytes, payload, err := pack.UnpackSignedMsg(buf[:n])
+			sum, timeBytes, payload, err := auth.UnpackSignedMsg(buf[:n])
 			if err != nil {
 				fmt.Println("unpack msg err:", err)
 				continue
@@ -62,9 +62,10 @@ func (t *Transporter) handleTail(conn *net.UDPConn, raddr *net.UDPAddr) {
 		lastPing: time.Now(),
 	}
 	t.mu.Unlock()
-	payload, err := pack.PackMsg(&msg.Msg{
+	txt := "tailing logs..."
+	payload, err := proto.Marshal(&msg.Msg{
 		Fn:  "logd",
-		Msg: "tailing logs...",
+		Txt: &txt,
 	})
 	if err != nil {
 		fmt.Println("pack msg err:", err)

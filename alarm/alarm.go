@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/swissinfo-ch/logd/msg"
-	"github.com/swissinfo-ch/logd/pack"
 	"github.com/swissinfo-ch/logd/transport"
+	"google.golang.org/protobuf/proto"
 )
 
 type Svc struct {
@@ -55,7 +55,8 @@ func (s *Svc) Set(al *Alarm) {
 
 func (s *Svc) matchMsgs() {
 	for data := range s.In {
-		m, err := pack.UnpackMsg(*data)
+		m := &msg.Msg{}
+		err := proto.Unmarshal(*data, m)
 		if err != nil {
 			fmt.Println("alarm unpack msg err:", err)
 		}
@@ -64,7 +65,7 @@ func (s *Svc) matchMsgs() {
 				continue
 			}
 			fmt.Println("event matched alarm", al.Name)
-			al.Events[m.Timestamp] = &Event{
+			al.Events[m.T.AsTime().UnixMicro()] = &Event{
 				Msg:      m,
 				Occurred: time.Now(),
 			}

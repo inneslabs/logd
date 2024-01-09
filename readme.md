@@ -1,7 +1,7 @@
 # Logd
 ![A circular buffer](.doc/circular_buffer.svg)
 ## Logs for your apps in constant time and constant space with ultra-low latency.
-Logd is a non-blocking circular buffer to store millions of logs per hour.
+Logd is a circular buffer for writing & reading millions of logs per minute.
 
 
 # Logd is a circular buffer

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/swissinfo-ch/logd/msg"
-	"github.com/swissinfo-ch/logd/pack"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -32,9 +32,10 @@ func (t *Transporter) kickSub(conn *net.UDPConn, sub *Sub, raddr string) {
 	delete(t.subs, raddr)
 	t.mu.Unlock()
 	fmt.Printf("kicked %s, no ping received, timed out\r\n", raddr)
-	payload, err := pack.PackMsg(&msg.Msg{
+	txt := "you've been kicked, ping timed out"
+	payload, err := proto.Marshal(&msg.Msg{
 		Fn:  "logd",
-		Msg: "you've been kicked, ping timed out",
+		Txt: &txt,
 	})
 	if err != nil {
 		fmt.Println("pack msg err:", err)

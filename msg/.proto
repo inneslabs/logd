@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "./msg";
+
+message Msg {
+  google.protobuf.Timestamp t = 1;
+  string env = 3;
+  string svc = 4;
+  string fn = 5;
+  optional Lvl lvl = 6;
+  optional string txt = 7;
+  optional string stackTrace = 8;
+  optional HttpMethod httpMethod = 9;
+  optional string url = 10;
+  optional int32 responseStatus = 11;
+}
+
+enum Lvl {
+  TRACE = 0;
+  DEBUG = 1;
+  INFO = 2;
+  WARN = 3;
+  ERROR = 4;
+  FATAL = 5;
+}
+
+enum HttpMethod {
+  UNKNOWN = 0;
+  DELETE = 1;
+  GET = 2;
+  HEAD = 3;
+  OPTIONS = 4;
+  PATCH = 5;
+  POST = 6;
+  PUT = 7;
+}

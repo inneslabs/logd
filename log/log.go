@@ -8,18 +8,9 @@ import (
 	"github.com/swissinfo-ch/logd/auth"
 	"github.com/swissinfo-ch/logd/conn"
 	"github.com/swissinfo-ch/logd/msg"
-	"github.com/swissinfo-ch/logd/pack"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-const (
-	Error = Lvl("ERROR")
-	Warn  = Lvl("WARN")
-	Info  = Lvl("INFO")
-	Debug = Lvl("DEBUG")
-	Trace = Lvl("TRACE")
-)
-
-type Lvl string
 
 type Logger struct {
 	conn   net.Conn
@@ -55,32 +46,17 @@ func NewLogger(cfg *LoggerConfig) (*Logger, error) {
 	}, nil
 }
 
-// Log writes a logd entry to Logger Conn
-func (l *Logger) Log(lvl Lvl, template string, args ...interface{}) {
-	// build msg
-	payload, err := pack.PackMsg(&msg.Msg{
-		Timestamp: time.Now().UnixNano(),
-		Env:       l.env,
-		Svc:       l.svc,
-		Fn:        l.fn,
-		Lvl:       string(lvl),
-		Msg:       fmt.Sprintf(template, args...),
+// Log writes a msg to Logger socket
+func (l *Logger) Log(lvl *msg.Lvl, template string, args ...interface{}) {
+	txt := fmt.Sprintf(template, args...)
+	payload, _ := proto.Marshal(&msg.Msg{
+		T:   timestamppb.Now(),
+		Env: l.env,
+		Svc: l.svc,
+		Fn:  l.fn,
+		Lvl: lvl,
+		Txt: &txt,
 	})
-	if err != nil {
-		fmt.Println("logd.log pack msg err:", err)
-		return
-	}
-
-	// get ephemeral signature
-	signedMsg, err := auth.Sign(l.secret, payload, time.Now())
-	if err != nil {
-		fmt.Println("logd.log sign msg err:", err)
-		return
-	}
-
-	// write to socket
-	_, err = l.conn.Write(signedMsg)
-	if err != nil {
-		fmt.Println("logd.log write udp err:", err)
-	}
+	signedMsg, _ := auth.Sign(l.secret, payload, time.Now())
+	l.conn.Write(signedMsg)
 }
