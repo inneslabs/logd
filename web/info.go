@@ -14,7 +14,7 @@ import (
 )
 
 type Info struct {
-	Uptime    time.Duration  `json:"uptime"`
+	Uptime    string         `json:"uptime"`
 	Machine   *MachineInfo   `json:"machine"`
 	Buffer    *BufferInfo    `json:"buffer"`
 	Transport *TransportInfo `json:"transport"`
@@ -76,7 +76,7 @@ func (s *Webserver) measureInfo() {
 		memStats := &runtime.MemStats{}
 		runtime.ReadMemStats(memStats)
 		info = &Info{
-			Uptime: time.Since(s.Started),
+			Uptime: time.Since(s.Started).String(),
 			Machine: &MachineInfo{
 				MemAllocMB: float64(memStats.Alloc) / 1024 / 1024,
 				MemTotalMB: totalMemory,
