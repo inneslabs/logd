@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -100,6 +101,9 @@ func (s *Webserver) measureInfo() {
 				TimeLastTriggered: a.LastTriggered.UnixMilli(),
 			})
 		}
+		sort.Slice(info.Alarms, func(i, j int) bool {
+			return info.Alarms[i].Name < info.Alarms[j].Name
+		})
 		time.Sleep(time.Millisecond * 500)
 	}
 }
