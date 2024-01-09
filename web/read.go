@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/fxamacker/cbor/v2"
 	"github.com/swissinfo-ch/logd/msg"
+	"google.golang.org/protobuf/proto"
 )
 
 func (s *Webserver) handleRead(w http.ResponseWriter, r *http.Request) {
@@ -52,9 +52,10 @@ func (s *Webserver) handleRead(w http.ResponseWriter, r *http.Request) {
 		offset += limit
 		e := &msg.Msg{}
 		for _, i := range items {
-			err := cbor.Unmarshal(*i, e)
+			m := &msg.Msg{}
+			err := proto.Unmarshal(*i, m)
 			if err != nil {
-				fmt.Println("failed to unmarshal entry:", err)
+				fmt.Println("failed to unmarshal msg:", err)
 				continue
 			}
 			if envQ != "" && envQ != e.Env {
