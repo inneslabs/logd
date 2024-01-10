@@ -7,7 +7,7 @@ option go_package = "./cmd";
 message Cmd {
   Name name = 1;
   optional Msg msg = 2;
-  repeated string args = 3;
+  optional QueryParams queryParams = 3;
 }
 
 enum Name {
@@ -22,6 +22,20 @@ message Msg {
   string env = 3;
   string svc = 4;
   string fn = 5;
+  optional Lvl lvl = 6;
+  optional string txt = 7;
+  optional string stackTrace = 8;
+  optional HttpMethod httpMethod = 9;
+  optional string url = 10;
+  optional int32 responseStatus = 11;
+}
+
+message QueryParams {
+  optional google.protobuf.Timestamp tStart = 1;
+  optional google.protobuf.Timestamp tEnd = 2;
+  optional string env = 3;
+  optional string svc = 4;
+  optional string fn = 5;
   optional Lvl lvl = 6;
   optional string txt = 7;
   optional string stackTrace = 8;
@@ -49,3 +63,4 @@ enum HttpMethod {
   POST = 6;
   PUT = 7;
 }
+

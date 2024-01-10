@@ -62,12 +62,17 @@ func (t *Transporter) handleWrite(c *cmd.Cmd, raddr *net.UDPAddr, sum, timeBytes
 	if !valid || err != nil {
 		return fmt.Errorf("%s unauthorised to write: %w", raddr.IP.String(), err)
 	}
+	// marshal msg
+	msgBytes, err := proto.Marshal(c.Msg)
+	if err != nil {
+		return fmt.Errorf("protobuf marshal msg err: %w", err)
+	}
 	// pipe to tails
-	t.Out <- &payload
+	t.Out <- &msgBytes
 	// pipe to alarm svc
 	t.alarmSvc.In <- c.Msg
 	// write to buffer
-	t.buf.Write(&payload)
+	t.buf.Write(&msgBytes)
 	return nil
 }
 

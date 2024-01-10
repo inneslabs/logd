@@ -1,7 +1,7 @@
 /*
 Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
 */
-package tail
+package query
 
 import (
 	"fmt"
@@ -14,47 +14,29 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func TailMsg(conn net.Conn, readSecret []byte) (<-chan *cmd.Msg, error) {
-	err := sendTailCmd(conn, readSecret)
-	if err != nil {
-		return nil, fmt.Errorf("send tail cmd err: %w", err)
-	}
-	out := make(chan *cmd.Msg)
-	go readMsg(conn, out)
-	go ping(conn, readSecret)
-	return out, nil
-}
-
-func TailPlain(conn net.Conn, readSecret []byte) (<-chan *[]byte, error) {
-	err := sendTailCmd(conn, readSecret)
-	if err != nil {
-		return nil, fmt.Errorf("send tail cmd err: %w", err)
-	}
-	out := make(chan *[]byte)
-	go readPlain(conn, out)
-	go ping(conn, readSecret)
-	return out, nil
-}
-
-func sendTailCmd(conn net.Conn, readSecret []byte) error {
+func Query(q *cmd.QueryParams, conn net.Conn, readSecret []byte) (<-chan *cmd.Msg, error) {
 	payload, err := proto.Marshal(&cmd.Cmd{
-		Name: cmd.Name_TAIL,
+		Name:        cmd.Name_QUERY,
+		QueryParams: q,
 	})
 	if err != nil {
-		return fmt.Errorf("marshal ping msg err: %w", err)
+		return nil, fmt.Errorf("marshal ping msg err: %w", err)
 	}
 	sig, err := auth.Sign(readSecret, payload, time.Now())
 	if err != nil {
-		return fmt.Errorf("sign tail msg err: %w", err)
+		return nil, fmt.Errorf("sign tail msg err: %w", err)
 	}
 	_, err = conn.Write(sig)
 	if err != nil {
-		return fmt.Errorf("write tail msg err: %w", err)
+		return nil, fmt.Errorf("write tail msg err: %w", err)
 	}
-	return nil
+	out := make(chan *cmd.Msg)
+	go read(conn, out)
+	go ping(conn, readSecret)
+	return out, nil
 }
 
-func readMsg(conn net.Conn, out chan<- *cmd.Msg) {
+func read(conn net.Conn, out chan<- *cmd.Msg) {
 	for {
 		buf := make([]byte, 2048)
 		n, err := conn.Read(buf)
@@ -68,18 +50,6 @@ func readMsg(conn net.Conn, out chan<- *cmd.Msg) {
 			continue
 		}
 		out <- m
-	}
-}
-
-func readPlain(conn net.Conn, out chan<- *[]byte) {
-	for {
-		buf := make([]byte, 2048)
-		n, err := conn.Read(buf)
-		if err != nil {
-			fmt.Printf("error reading from conn: %s\r\n", err)
-		}
-		slice := buf[:n]
-		out <- &slice
 	}
 }
 

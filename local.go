@@ -25,22 +25,19 @@ func tailLogd(t *transport.Transporter, tailHost, tailReadSecret string) {
 		fmt.Println("failed to get conn:", err)
 		return
 	}
-	msgs, err := tail.Tail(c, []byte(tailReadSecret), tail.Plain)
+	msgs, err := tail.TailPlain(c, []byte(tailReadSecret))
 	if err != nil {
 		fmt.Println("failed to get tail:", err)
 		return
 	}
 	fmt.Println("tailing", tailHost)
 	for m := range msgs {
-		payload, ok := m.([]byte)
-		if ok {
-			// pipe to tails
-			t.Out <- &payload
-			// write to buffer
-			buf.Write(&payload)
-			// don't pipe to alarm svc
-			// because this would require unmarshaling the payload
-			// only implement here if required for testing.
-		}
+		// pipe to tails
+		t.Out <- m
+		// write to buffer
+		buf.Write(m)
+		// don't pipe to alarm svc
+		// because this would require unmarshaling the payload
+		// only implement if later required.
 	}
 }
