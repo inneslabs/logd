@@ -64,7 +64,6 @@ func (s *Svc) matchMsgs() {
 			if !al.Match(m) {
 				continue
 			}
-			fmt.Println("event matched alarm", al.Name)
 			al.Events[m.T.AsTime().UnixMicro()] = &Event{
 				Msg:      m,
 				Occurred: time.Now(),
