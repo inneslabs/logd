@@ -22,7 +22,13 @@ const (
 )
 
 func Tail(conn net.Conn, readSecret []byte, format Format) (<-chan any, error) {
-	sig, err := auth.Sign(readSecret, []byte("tail"), time.Now())
+	payload, err := proto.Marshal(&cmd.Cmd{
+		Name: cmd.Name_TAIL,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("marshal ping msg err: %w", err)
+	}
+	sig, err := auth.Sign(readSecret, payload, time.Now())
 	if err != nil {
 		return nil, fmt.Errorf("sign tail msg err: %w", err)
 	}
