@@ -65,6 +65,7 @@ func (t *Transporter) handleTail(conn *net.UDPConn, raddr *net.UDPAddr) {
 	txt := "tailing logs..."
 	payload, err := proto.Marshal(&msg.Msg{
 		Fn:  "logd",
+		Lvl: msg.Lvl_INFO.Enum(),
 		Txt: &txt,
 	})
 	if err != nil {
