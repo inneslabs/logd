@@ -15,11 +15,10 @@ import (
 )
 
 type Info struct {
-	Uptime    string         `json:"uptime"`
-	Machine   *MachineInfo   `json:"machine"`
-	Buffer    *BufferInfo    `json:"buffer"`
-	Transport *TransportInfo `json:"transport"`
-	Alarms    []*AlarmStatus `json:"alarms"`
+	Uptime  string         `json:"uptime"`
+	Machine *MachineInfo   `json:"machine"`
+	Buffer  *BufferInfo    `json:"buffer"`
+	Alarms  []*AlarmStatus `json:"alarms"`
 }
 
 type MachineInfo struct {
@@ -30,11 +29,6 @@ type MachineInfo struct {
 type BufferInfo struct {
 	Writes uint64 `json:"writes"`
 	Size   uint32 `json:"size"`
-}
-
-type TransportInfo struct {
-	LenInChan  int `json:"lenInChan"`
-	LenOutChan int `json:"lenOutChan"`
 }
 
 type AlarmStatus struct {
@@ -85,10 +79,6 @@ func (s *Webserver) measureInfo() {
 			Buffer: &BufferInfo{
 				Writes: s.Buf.Writes.Load(),
 				Size:   s.Buf.Size(),
-			},
-			Transport: &TransportInfo{
-				LenInChan:  len(s.Transporter.In),
-				LenOutChan: len(s.Transporter.Out),
 			},
 			Alarms: make([]*AlarmStatus, 0),
 		}

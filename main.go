@@ -20,8 +20,8 @@ var (
 	bufferSizeStr  = os.Getenv("BUFFER_SIZE")
 	httpLaddr      = os.Getenv("HTTP_LADDR")
 	udpLaddr       = os.Getenv("UDP_LADDR")
-	readSecret     = []byte(os.Getenv("READ_SECRET"))
-	writeSecret    = []byte(os.Getenv("WRITE_SECRET"))
+	readSecret     = os.Getenv("READ_SECRET")
+	writeSecret    = os.Getenv("WRITE_SECRET")
 	slackWebhook   = os.Getenv("SLACK_WEBHOOK")
 	tailHost       = os.Getenv("TAIL_HOST")
 	tailReadSecret = os.Getenv("TAIL_READ_SECRET")
@@ -42,39 +42,31 @@ func main() {
 	ctx, cancel := context.WithCancel(context.Background())
 	go cancelOnSig(sigs, cancel)
 
-	t := transport.NewTransporter(readSecret, writeSecret)
-	go t.Listen(ctx, udpLaddr)
+	alarmSvc := alarm.NewSvc()
+	alarmSvc.Set(prodWpErrors())
+	alarmSvc.Set(prodErrors())
 
-	a := alarm.NewSvc()
-	a.Set(prodWpErrors())
-	a.Set(prodErrors())
+	t := transport.NewTransporter(&transport.TransporterConfig{
+		ReadSecret:  readSecret,
+		WriteSecret: writeSecret,
+		Buf:         buf,
+		AlarmSvc:    alarmSvc,
+	})
+	go t.Listen(ctx, udpLaddr)
 
 	h := &web.Webserver{
 		ReadSecret:  string(readSecret),
 		Buf:         buf,
 		Transporter: t,
-		AlarmSvc:    a,
+		AlarmSvc:    alarmSvc,
 		Started:     time.Now(),
 	}
 	go h.ServeHttp(httpLaddr)
 
 	go tailLogd(t, tailHost, tailReadSecret)
 
-	go io(t, a)
-
 	<-ctx.Done()
 	fmt.Println("all routines ended")
-}
-
-func io(t *transport.Transporter, a *alarm.Svc) {
-	for msg := range t.In {
-		// pipe to tails
-		t.Out <- msg
-		// pipe to alarm svc
-		a.In <- msg
-		// write to buffer
-		buf.Write(msg)
-	}
 }
 
 func cancelOnSig(sigs chan os.Signal, cancel context.CancelFunc) {

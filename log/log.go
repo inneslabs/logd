@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/swissinfo-ch/logd/auth"
+	"github.com/swissinfo-ch/logd/cmd"
 	"github.com/swissinfo-ch/logd/conn"
-	"github.com/swissinfo-ch/logd/msg"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -47,9 +47,9 @@ func NewLogger(cfg *LoggerConfig) (*Logger, error) {
 }
 
 // Log writes a msg to Logger socket
-func (l *Logger) Log(lvl *msg.Lvl, template string, args ...interface{}) {
+func (l *Logger) Log(lvl *cmd.Lvl, template string, args ...interface{}) {
 	txt := fmt.Sprintf(template, args...)
-	payload, _ := proto.Marshal(&msg.Msg{
+	payload, _ := proto.Marshal(&cmd.Msg{
 		T:   timestamppb.Now(),
 		Env: l.env,
 		Svc: l.svc,

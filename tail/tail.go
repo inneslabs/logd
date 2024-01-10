@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/swissinfo-ch/logd/auth"
-	"github.com/swissinfo-ch/logd/msg"
+	"github.com/swissinfo-ch/logd/cmd"
 	"github.com/swissinfo-ch/logd/transport"
 	"google.golang.org/protobuf/proto"
 )
@@ -44,7 +44,7 @@ func read(conn net.Conn, out chan<- any, format Format) {
 		case Plain:
 			out <- buf[:n]
 		case Msg:
-			m := &msg.Msg{}
+			m := &cmd.Msg{}
 			err := proto.Unmarshal(buf[:n], m)
 			if err != nil {
 				fmt.Println("unpack msg err:", err)

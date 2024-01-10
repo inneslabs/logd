@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/swissinfo-ch/logd/msg"
+	"github.com/swissinfo-ch/logd/cmd"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -41,7 +41,7 @@ func (s *Webserver) handleRead(w http.ResponseWriter, r *http.Request) {
 	envQ := r.URL.Query().Get("env")
 	svcQ := r.URL.Query().Get("svc")
 	fnQ := r.URL.Query().Get("fn")
-	results := make([]*msg.Msg, 0)
+	results := make([]*cmd.Msg, 0)
 	pages := 0
 	bufSize := int(s.Buf.Size())
 	offset32 := uint32(offset)
@@ -50,7 +50,7 @@ func (s *Webserver) handleRead(w http.ResponseWriter, r *http.Request) {
 		items := s.Buf.Read(offset32, limit32)
 		pages++
 		offset += limit
-		e := &msg.Msg{}
+		e := &cmd.Msg{}
 		for _, i := range items {
 			err := proto.Unmarshal(*i, e)
 			if err != nil {

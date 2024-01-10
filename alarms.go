@@ -4,13 +4,13 @@ import (
 	"time"
 
 	"github.com/swissinfo-ch/logd/alarm"
-	"github.com/swissinfo-ch/logd/msg"
+	"github.com/swissinfo-ch/logd/cmd"
 )
 
 func prodWpErrors() *alarm.Alarm {
 	return &alarm.Alarm{
 		Name: "prod/wp/error",
-		Match: func(m *msg.Msg) bool {
+		Match: func(m *cmd.Msg) bool {
 			if m.Env != "prod" {
 				return false
 			}
@@ -36,14 +36,14 @@ func prodWpErrors() *alarm.Alarm {
 func prodErrors() *alarm.Alarm {
 	return &alarm.Alarm{
 		Name: "prod/error",
-		Match: func(m *msg.Msg) bool {
+		Match: func(m *cmd.Msg) bool {
 			if m.Env != "prod" {
 				return false
 			}
 			if m.Lvl == nil {
 				return false
 			}
-			if *m.Lvl != msg.Lvl_ERROR {
+			if *m.Lvl != cmd.Lvl_ERROR {
 				return false
 			}
 			return true

@@ -5,7 +5,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/swissinfo-ch/logd/msg"
+	"github.com/swissinfo-ch/logd/cmd"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -33,7 +33,7 @@ func (t *Transporter) kickSub(conn *net.UDPConn, sub *Sub, raddr string) {
 	t.mu.Unlock()
 	fmt.Printf("kicked %s, no ping received, timed out\r\n", raddr)
 	txt := "you've been kicked, ping timed out"
-	payload, err := proto.Marshal(&msg.Msg{
+	payload, err := proto.Marshal(&cmd.Msg{
 		Fn:  "logd",
 		Txt: &txt,
 	})

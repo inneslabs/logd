@@ -6,10 +6,13 @@ import (
 	"net"
 	"sync"
 	"time"
+
+	"github.com/swissinfo-ch/logd/alarm"
+	"github.com/swissinfo-ch/logd/ring"
 )
 
 const (
-	ChanBufferSize   = 10 // payloads to buffer throughout logd
+	ChanBufferSize   = 1 // payloads to buffer throughout logd
 	socketBufferSize = 2048
 )
 
@@ -19,22 +22,30 @@ type Sub struct {
 }
 
 type Transporter struct {
-	In          chan *[]byte
 	Out         chan *[]byte
 	subs        map[string]*Sub
 	mu          sync.Mutex
 	readSecret  []byte
 	writeSecret []byte
+	buf         *ring.RingBuffer
+	alarmSvc    *alarm.Svc
+}
+type TransporterConfig struct {
+	ReadSecret  string
+	WriteSecret string
+	Buf         *ring.RingBuffer
+	AlarmSvc    *alarm.Svc
 }
 
-func NewTransporter(readSecret, writeSecret []byte) *Transporter {
+func NewTransporter(cfg *TransporterConfig) *Transporter {
 	return &Transporter{
-		In:          make(chan *[]byte, ChanBufferSize),
 		Out:         make(chan *[]byte, ChanBufferSize),
 		subs:        make(map[string]*Sub),
 		mu:          sync.Mutex{},
-		readSecret:  readSecret,
-		writeSecret: writeSecret,
+		readSecret:  []byte(cfg.ReadSecret),
+		writeSecret: []byte(cfg.WriteSecret),
+		buf:         cfg.Buf,
+		alarmSvc:    cfg.AlarmSvc,
 	}
 }
 

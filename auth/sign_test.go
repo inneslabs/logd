@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/swissinfo-ch/logd/msg"
+	"github.com/swissinfo-ch/logd/cmd"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -12,9 +12,12 @@ import (
 func TestSignAndVerify(t *testing.T) {
 	sec := []byte("testsecret")
 	txt := "this is a test"
-	payload, err := proto.Marshal(&msg.Msg{
-		T:   timestamppb.Now(),
-		Txt: &txt,
+	payload, err := proto.Marshal(&cmd.Cmd{
+		Name: cmd.Name_WRITE,
+		Msg: &cmd.Msg{
+			T:   timestamppb.Now(),
+			Txt: &txt,
+		},
 	})
 	if err != nil {
 		t.FailNow()
@@ -36,9 +39,12 @@ func TestSignAndVerify(t *testing.T) {
 func TestSignAndVerifyInvalid(t *testing.T) {
 	sec := []byte("testsecret")
 	txt := "this is a test"
-	payload, err := proto.Marshal(&msg.Msg{
-		T:   timestamppb.Now(),
-		Txt: &txt,
+	payload, err := proto.Marshal(&cmd.Cmd{
+		Name: cmd.Name_WRITE,
+		Msg: &cmd.Msg{
+			T:   timestamppb.Now(),
+			Txt: &txt,
+		},
 	})
 	if err != nil {
 		t.FailNow()

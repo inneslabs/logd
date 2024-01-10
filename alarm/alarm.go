@@ -5,13 +5,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/swissinfo-ch/logd/msg"
-	"github.com/swissinfo-ch/logd/transport"
-	"google.golang.org/protobuf/proto"
+	"github.com/swissinfo-ch/logd/cmd"
 )
 
 type Svc struct {
-	In        chan *[]byte
+	In        chan *cmd.Msg
 	Alarms    map[string]*Alarm
 	triggered chan *Alarm
 	mu        sync.Mutex
@@ -19,7 +17,7 @@ type Svc struct {
 
 type Alarm struct {
 	Name          string
-	Match         func(*msg.Msg) bool
+	Match         func(*cmd.Msg) bool
 	Period        time.Duration // period of analysis
 	Threshold     int
 	Events        map[int64]*Event // key is unix milli
@@ -29,17 +27,22 @@ type Alarm struct {
 }
 
 type Event struct {
-	Msg      *msg.Msg
+	Msg      *cmd.Msg
 	Occurred time.Time
 }
 
+// number of routines matching messages
+var workerCount = 10
+
 func NewSvc() *Svc {
 	s := &Svc{
-		In:        make(chan *[]byte, transport.ChanBufferSize),
+		In:        make(chan *cmd.Msg, workerCount),
 		Alarms:    make(map[string]*Alarm),
 		triggered: make(chan *Alarm),
 	}
-	go s.matchMsgs()
+	for w := 0; w < workerCount; w++ {
+		go s.matchMsgs()
+	}
 	go s.kickOldEvents()
 	go s.callActions()
 	return s
@@ -54,18 +57,13 @@ func (s *Svc) Set(al *Alarm) {
 }
 
 func (s *Svc) matchMsgs() {
-	for data := range s.In {
-		m := &msg.Msg{}
-		err := proto.Unmarshal(*data, m)
-		if err != nil {
-			fmt.Println("alarm unpack msg err:", err)
-		}
+	for msg := range s.In {
 		for _, al := range s.Alarms {
-			if !al.Match(m) {
+			if !al.Match(msg) {
 				continue
 			}
-			al.Events[m.T.AsTime().UnixMicro()] = &Event{
-				Msg:      m,
+			al.Events[msg.T.AsTime().UnixMicro()] = &Event{
+				Msg:      msg,
 				Occurred: time.Now(),
 			}
 			if len(al.Events) >= al.Threshold {

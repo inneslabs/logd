@@ -2,7 +2,20 @@ syntax = "proto3";
 
 import "google/protobuf/timestamp.proto";
 
-option go_package = "./msg";
+option go_package = "./cmd";
+
+message Cmd {
+  Name name = 1;
+  optional Msg msg = 2;
+  repeated string args = 3;
+}
+
+enum Name {
+  WRITE = 0;
+  TAIL = 1;
+  PING = 2;
+  QUERY = 3;
+}
 
 message Msg {
   google.protobuf.Timestamp t = 1;
