@@ -12,6 +12,15 @@ As the buffer becomes full, each write overwrites the oldest element.
 Logd authenticates clients for either reading or writing using 2 shared secrets.
 These are stored encrypted in our secrets SOPS file.
 
+## Why no SSO?
+This is an important design choice for separation of concerns.
+This will probably not change.
+
+If you want to put it behind SSO, just write a proxy. ;)
+
+This is a simple, performant & usable service that
+you can, and should, build on.
+
 # HTTP API
 Logd starts a http server.
 ### GET /

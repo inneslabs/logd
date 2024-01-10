@@ -1,3 +1,6 @@
+/*
+Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
+*/
 package tail
 
 import (
@@ -58,7 +61,14 @@ func read(conn net.Conn, out chan<- any, format Format) {
 func ping(conn net.Conn, readSecret []byte) {
 	for {
 		time.Sleep(transport.PingPeriod)
-		sig, err := auth.Sign(readSecret, []byte("ping"), time.Now())
+		payload, err := proto.Marshal(&cmd.Cmd{
+			Name: cmd.Name_PING,
+		})
+		if err != nil {
+			fmt.Println("marshal ping msg err:", err)
+			continue
+		}
+		sig, err := auth.Sign(readSecret, payload, time.Now())
 		if err != nil {
 			fmt.Println("sign ping msg err:", err)
 			continue
