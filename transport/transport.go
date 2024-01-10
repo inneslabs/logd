@@ -11,7 +11,10 @@ import (
 	"time"
 
 	"github.com/swissinfo-ch/logd/alarm"
+	"github.com/swissinfo-ch/logd/auth"
+	"github.com/swissinfo-ch/logd/cmd"
 	"github.com/swissinfo-ch/logd/ring"
+	"google.golang.org/protobuf/proto"
 )
 
 const (
@@ -76,4 +79,63 @@ func (t *Transporter) Listen(ctx context.Context, laddr string) {
 	go t.kickLateSubs(conn)
 	<-ctx.Done()
 	fmt.Println("stopped listening udp")
+}
+
+func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
+	var buf []byte
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+			buf = make([]byte, socketBufferSize)
+			conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
+			n, raddr, err := conn.ReadFromUDP(buf)
+			if err != nil {
+				continue
+			}
+			sum, timeBytes, payload, err := auth.UnpackSignedMsg(buf[:n])
+			if err != nil {
+				fmt.Println("unpack msg err:", err)
+				continue
+			}
+			c := &cmd.Cmd{}
+			err = proto.Unmarshal(payload, c)
+			if err != nil {
+				fmt.Println("protobuf unmarshal err:", err)
+				continue
+			}
+			switch c.GetName() {
+			case cmd.Name_WRITE:
+				err = t.handleWrite(c, raddr, sum, timeBytes, payload)
+			case cmd.Name_TAIL:
+				err = t.handleTail(conn, raddr, sum, timeBytes, payload)
+			case cmd.Name_PING:
+				err = t.handlePing(raddr, sum, timeBytes, payload)
+			case cmd.Name_QUERY:
+				err = t.handleQuery(c, conn, raddr, sum, timeBytes, payload)
+			}
+			if err != nil {
+				fmt.Println(err)
+			}
+		}
+	}
+}
+
+func (t *Transporter) writeToConn(ctx context.Context, conn *net.UDPConn) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case msg := <-t.Out:
+			for raddr, sub := range t.subs {
+				go func(msg *[]byte, sub *Sub, raddr string) {
+					_, err := conn.WriteToUDP(*msg, sub.raddr)
+					if err != nil {
+						fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
+					}
+				}(msg, sub, raddr)
+			}
+		}
+	}
 }

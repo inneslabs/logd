@@ -10,7 +10,6 @@ import (
 
 	"github.com/swissinfo-ch/logd/auth"
 	"github.com/swissinfo-ch/logd/cmd"
-	"github.com/swissinfo-ch/logd/transport"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -32,7 +31,6 @@ func Query(q *cmd.QueryParams, conn net.Conn, readSecret []byte) (<-chan *cmd.Ms
 	}
 	out := make(chan *cmd.Msg)
 	go read(conn, out)
-	go ping(conn, readSecret)
 	return out, nil
 }
 
@@ -50,27 +48,5 @@ func read(conn net.Conn, out chan<- *cmd.Msg) {
 			continue
 		}
 		out <- m
-	}
-}
-
-func ping(conn net.Conn, readSecret []byte) {
-	for {
-		time.Sleep(transport.PingPeriod)
-		payload, err := proto.Marshal(&cmd.Cmd{
-			Name: cmd.Name_PING,
-		})
-		if err != nil {
-			fmt.Println("marshal ping msg err:", err)
-			continue
-		}
-		sig, err := auth.Sign(readSecret, payload, time.Now())
-		if err != nil {
-			fmt.Println("sign ping msg err:", err)
-			continue
-		}
-		_, err = conn.Write(sig)
-		if err != nil {
-			fmt.Println("write ping msg err:", err)
-		}
 	}
 }
