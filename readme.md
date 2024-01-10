@@ -22,6 +22,8 @@ curl --location "$LOGD_HOST/?limit=10" \
 ```
 
 # UDP
+Logd is built on Protobuf. Messages are serialised using the `msg.Msg` type generated from the Protobuf definition.
+
 ## Logger
 The simplest way to write logs is using the `log` package.
 ```go
@@ -37,15 +39,14 @@ l.Log(log.Info, "this is an example %s", "log message")
 
 ## Custom integration
 Logs are written by connecting to a UDP socket on port `:6102`.
+See the following example. Error checks skipped for brevity.
 ```go
-// error checks skipped for brevity
-
 // dial udp
 addr, _ := conn.GetAddr("logd.fly.dev")
-conn, _ := conn.Dial(addr)
+socket, _ := conn.Dial(addr)
 
-// serialise message
-payload, _ := pack.PackMsg(&msg.Msg{
+// serialise message using protobuf
+payload, _ := proto.Marshal(&msg.Msg{
   Timestamp: time.Now().UnixNano(),
   Env:       l.Env,
   Svc:       l.Svc,
@@ -55,8 +56,8 @@ payload, _ := pack.PackMsg(&msg.Msg{
 })
 
 // get ephemeral signature using current time
-signedMsg, _ := auth.Sign(l.Secret, payload, time.Now())
+signedMsg, _ := auth.Sign("some-secret-value", payload, time.Now())
 
 // write to socket
-l.Conn.Write(signedMsg)
+socket.Write(signedMsg)
 ```
