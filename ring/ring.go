@@ -61,6 +61,7 @@ func (r *RingBuffer) Read(offset, limit uint32) []*[]byte {
 	return output
 }
 
-func (r *RingBuffer) ReadOne(offset uint32) *[]byte {
-	return r.values[offset%r.size]
+// Returns the record {offset} slots ahead of head (oldest first)
+func (r *RingBuffer) ReadOneAhead(offset uint32) *[]byte {
+	return r.values[(r.head.Load()+offset)%r.size]
 }

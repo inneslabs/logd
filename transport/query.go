@@ -16,6 +16,19 @@ func (t *Transporter) handleQuery(c *cmd.Cmd, conn *net.UDPConn, raddr *net.UDPA
 	if !valid || err != nil {
 		return fmt.Errorf("%s unauthorised to query: %w", raddr.IP.String(), err)
 	}
+	respTxt := "querying logs..."
+	payload, err = proto.Marshal(&cmd.Msg{
+		Fn:  "logd",
+		Lvl: cmd.Lvl_INFO.Enum(),
+		Txt: &respTxt,
+	})
+	if err != nil {
+		return fmt.Errorf("protobuf marshal err: %w", err)
+	}
+	_, err = conn.WriteToUDP(payload, raddr)
+	if err != nil {
+		return fmt.Errorf("write udp err: (%s) %s", raddr, err)
+	}
 	limit := limit(c.GetQueryParams(), t.buf.Size())
 	tStart := tStart(c.GetQueryParams())
 	tEnd := tEnd(c.GetQueryParams())
@@ -30,8 +43,11 @@ func (t *Transporter) handleQuery(c *cmd.Cmd, conn *net.UDPConn, raddr *net.UDPA
 	max := t.buf.Size()
 	var offset, found uint32
 	for offset < max && found < limit {
-		payload := t.buf.ReadOne(offset)
+		payload := t.buf.ReadOneAhead(offset)
 		offset++
+		if payload == nil {
+			continue
+		}
 		msg := &cmd.Msg{}
 		err = proto.Unmarshal(*payload, msg)
 		if err != nil {
@@ -79,6 +95,20 @@ func (t *Transporter) handleQuery(c *cmd.Cmd, conn *net.UDPConn, raddr *net.UDPA
 		}
 		found++
 	}
+	time.Sleep(time.Millisecond * 50) // ensure +END arrives last
+	end := "+END"
+	endPayload, err := proto.Marshal(&cmd.Msg{
+		Fn:  "logd",
+		Txt: &end,
+	})
+	if err != nil {
+		fmt.Printf("end msg proto marshal err: %s\r\n", err)
+	}
+	_, err = conn.WriteToUDP(endPayload, raddr)
+	if err != nil {
+		fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
+	}
+	fmt.Println("query found", found)
 	return nil
 }
 

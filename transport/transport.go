@@ -107,16 +107,13 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 			}
 			switch c.GetName() {
 			case cmd.Name_WRITE:
-				err = t.handleWrite(c, raddr, sum, timeBytes, payload)
+				go t.handleWrite(c, raddr, sum, timeBytes, payload)
 			case cmd.Name_TAIL:
-				err = t.handleTail(conn, raddr, sum, timeBytes, payload)
+				go t.handleTail(conn, raddr, sum, timeBytes, payload)
 			case cmd.Name_PING:
-				err = t.handlePing(raddr, sum, timeBytes, payload)
+				go t.handlePing(raddr, sum, timeBytes, payload)
 			case cmd.Name_QUERY:
-				err = t.handleQuery(c, conn, raddr, sum, timeBytes, payload)
-			}
-			if err != nil {
-				fmt.Println(err)
+				go t.handleQuery(c, conn, raddr, sum, timeBytes, payload)
 			}
 		}
 	}
