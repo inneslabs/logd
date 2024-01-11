@@ -76,7 +76,7 @@ func (t *Transporter) handleQuery(c *cmd.Cmd, conn *net.UDPConn, raddr *net.UDPA
 			continue
 		}
 		msgTxt := msg.GetTxt()
-		if txt != "" && msgTxt != "" && !strings.Contains(msgTxt, txt) {
+		if txt != "" && msgTxt != "" && !strings.Contains(strings.ToLower(msgTxt), strings.ToLower(txt)) {
 			continue
 		}
 		msgHttpMethod := msg.GetHttpMethod()
@@ -84,7 +84,7 @@ func (t *Transporter) handleQuery(c *cmd.Cmd, conn *net.UDPConn, raddr *net.UDPA
 			continue
 		}
 		msgUrl := msg.GetUrl()
-		if url != "" && msgUrl != "" && !strings.Contains(msgUrl, url) {
+		if url != "" && msgUrl != "" && !strings.HasPrefix(msgUrl, url) {
 			continue
 		}
 		msgResponseStatus := msg.GetResponseStatus()
