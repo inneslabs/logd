@@ -1,10 +1,9 @@
 # Logd
 ![A circular buffer](.doc/circular_buffer.svg)
 ## Logs for your apps in constant time and constant space with ultra-low latency.
-Logd is a circular buffer for writing & reading millions of logs per minute.
+Logd (pronounced "logged") is a circular buffer for writing & reading up to 1 million logs per minute.
 
-# Logd is a circular buffer
-Logd (pronounced "logged") will never run out of storage. Reads & writes are constant-time.
+Logd will never run out of memory if the buffer size is ok for the given machine spec. Reads & writes are constant-time.
 
 As the buffer becomes full, each write overwrites the oldest element.
 
@@ -31,7 +30,8 @@ curl --location "$LOGD_HOST/?limit=10" \
 ## GET /info
 
 # UDP
-Logd is built on Protobuf. Messages are serialised using the `msg.Msg` type generated from the Protobuf definition.
+## I'd tell you a joke about UDP, but you might not get it...
+Logd is built on Protobuf.
 
 ## Logger
 The simplest way to write logs is using the `log` package.
@@ -55,14 +55,18 @@ addr, _ := conn.GetAddr("logd.fly.dev")
 socket, _ := conn.Dial(addr)
 
 // serialise message using protobuf
-payload, _ := proto.Marshal(&msg.Msg{
-  Timestamp: time.Now().UnixNano(),
-  Env:       l.Env,
-  Svc:       l.Svc,
-  Fn:        l.Fn,
-  Lvl:       string(lvl),
-  Msg:       fmt.Sprintf(template, args...),
-})
+payload, err := proto.Marshal(&cmd.Cmd{
+		Name: cmd.Name_WRITE,
+		Msg: &cmd.Msg{
+			T:          timestamppb.Now(),
+			Env:        env,
+			Svc:        cwmsg.Svc,
+			Fn:         cwmsg.Fn,
+			Lvl:        &lvl,
+			Txt:        &cwmsg.Msg,
+			StackTrace: st,
+		},
+	})
 
 // get ephemeral signature using current time
 signedMsg, _ := auth.Sign("some-secret-value", payload, time.Now())

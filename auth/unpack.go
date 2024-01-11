@@ -5,12 +5,12 @@ package auth
 
 import "errors"
 
-func UnpackSignedMsg(msg []byte) (sum, timeBytes, payload []byte, err error) {
-	if len(msg) < sumLen+timeLen {
-		return nil, nil, nil, errors.New("msg too short")
+func UnpackSignedData(data []byte) (sum, timeBytes, payload []byte, err error) {
+	if len(data) < sumLen+timeLen {
+		return nil, nil, nil, errors.New("data too short")
 	}
-	return msg[:sumLen],
-		msg[sumLen : sumLen+timeLen],
-		msg[sumLen+timeLen:],
+	return data[:sumLen],
+		data[sumLen : sumLen+timeLen],
+		data[sumLen+timeLen:],
 		err
 }

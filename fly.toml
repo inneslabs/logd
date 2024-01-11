@@ -9,6 +9,9 @@ primary_region = "ams"
 [build]
   dockerfile = "fly.Dockerfile"
 
+[deploy]
+  strategy = "immediate"
+
 [env]
   BUFFER_SIZE = "1000000"
   HTTP_LADDR = ":6101"
@@ -33,3 +36,7 @@ primary_region = "ams"
   [[services.ports]]
     port = 6102
 
+[[vm]]
+  memory = "2GB"
+  cpus = 1
+  cpu_kind = "shared"

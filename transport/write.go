@@ -26,11 +26,11 @@ func (t *Transporter) handleWrite(c *cmd.Cmd, raddr *net.UDPAddr, sum, timeBytes
 	if err != nil {
 		return fmt.Errorf("protobuf marshal msg err: %w", err)
 	}
+	// write to buffer
+	t.buf.Write(&msgBytes)
 	// pipe to tails
 	t.Out <- &msgBytes
 	// pipe to alarm svc
 	t.alarmSvc.In <- c.Msg
-	// write to buffer
-	t.buf.Write(&msgBytes)
 	return nil
 }

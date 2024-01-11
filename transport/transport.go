@@ -18,8 +18,8 @@ import (
 )
 
 const (
-	ChanBufferSize   = 1 // payloads to buffer throughout logd
-	socketBufferSize = 2048
+	socketBufferSize      = 2048
+	socketBufferThreshold = 0.75
 )
 
 type Sub struct {
@@ -45,7 +45,7 @@ type TransporterConfig struct {
 
 func NewTransporter(cfg *TransporterConfig) *Transporter {
 	return &Transporter{
-		Out:         make(chan *[]byte, ChanBufferSize),
+		Out:         make(chan *[]byte, 1),
 		subs:        make(map[string]*Sub),
 		mu:          sync.Mutex{},
 		readSecret:  []byte(cfg.ReadSecret),
@@ -72,6 +72,14 @@ func (t *Transporter) Listen(ctx context.Context, laddr string) {
 	if err != nil {
 		panic(fmt.Errorf("listen udp err: %w", err))
 	}
+	err = conn.SetReadBuffer(socketBufferSize)
+	if err != nil {
+		panic(fmt.Errorf("set read buffer size err: %w", err))
+	}
+	err = conn.SetWriteBuffer(socketBufferSize)
+	if err != nil {
+		panic(fmt.Errorf("set write buffer size err: %w", err))
+	}
 	defer conn.Close()
 	fmt.Println("listening udp on", conn.LocalAddr())
 	go t.readFromConn(ctx, conn)
@@ -94,28 +102,35 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 			if err != nil {
 				continue
 			}
-			sum, timeBytes, payload, err := auth.UnpackSignedMsg(buf[:n])
-			if err != nil {
-				fmt.Println("unpack msg err:", err)
-				continue
+			if n >= socketBufferSize*socketBufferThreshold {
+				fmt.Printf("warning: socket buffer is >= %f full\r\n", socketBufferThreshold)
 			}
-			c := &cmd.Cmd{}
-			err = proto.Unmarshal(payload, c)
-			if err != nil {
-				fmt.Println("protobuf unmarshal err:", err)
-				continue
-			}
-			switch c.GetName() {
-			case cmd.Name_WRITE:
-				go t.handleWrite(c, raddr, sum, timeBytes, payload)
-			case cmd.Name_TAIL:
-				go t.handleTail(conn, raddr, sum, timeBytes, payload)
-			case cmd.Name_PING:
-				go t.handlePing(raddr, sum, timeBytes, payload)
-			case cmd.Name_QUERY:
-				go t.handleQuery(c, conn, raddr, sum, timeBytes, payload)
-			}
+			go t.handlePacket(buf[:n], conn, raddr)
 		}
+	}
+}
+
+func (t *Transporter) handlePacket(data []byte, conn *net.UDPConn, raddr *net.UDPAddr) {
+	sum, timeBytes, payload, err := auth.UnpackSignedData(data)
+	if err != nil {
+		fmt.Println("unpack msg err:", err)
+		return
+	}
+	c := &cmd.Cmd{}
+	err = proto.Unmarshal(payload, c)
+	if err != nil {
+		fmt.Println("protobuf unmarshal err:", err)
+		return
+	}
+	switch c.GetName() {
+	case cmd.Name_WRITE:
+		t.handleWrite(c, raddr, sum, timeBytes, payload)
+	case cmd.Name_TAIL:
+		t.handleTail(conn, raddr, sum, timeBytes, payload)
+	case cmd.Name_PING:
+		t.handlePing(raddr, sum, timeBytes, payload)
+	case cmd.Name_QUERY:
+		t.handleQuery(c, conn, raddr, sum, timeBytes, payload)
 	}
 }
 
