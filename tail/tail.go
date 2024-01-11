@@ -14,8 +14,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func TailMsg(conn net.Conn, readSecret []byte) (<-chan *cmd.Msg, error) {
-	err := sendTailCmd(conn, readSecret)
+func TailMsg(q *cmd.QueryParams, conn net.Conn, readSecret []byte) (<-chan *cmd.Msg, error) {
+	err := sendTailCmd(q, conn, readSecret)
 	if err != nil {
 		return nil, fmt.Errorf("send tail cmd err: %w", err)
 	}
@@ -25,8 +25,8 @@ func TailMsg(conn net.Conn, readSecret []byte) (<-chan *cmd.Msg, error) {
 	return out, nil
 }
 
-func TailPlain(conn net.Conn, readSecret []byte) (<-chan *[]byte, error) {
-	err := sendTailCmd(conn, readSecret)
+func TailPlain(q *cmd.QueryParams, conn net.Conn, readSecret []byte) (<-chan *[]byte, error) {
+	err := sendTailCmd(q, conn, readSecret)
 	if err != nil {
 		return nil, fmt.Errorf("send tail cmd err: %w", err)
 	}
@@ -36,9 +36,10 @@ func TailPlain(conn net.Conn, readSecret []byte) (<-chan *[]byte, error) {
 	return out, nil
 }
 
-func sendTailCmd(conn net.Conn, readSecret []byte) error {
+func sendTailCmd(q *cmd.QueryParams, conn net.Conn, readSecret []byte) error {
 	payload, err := proto.Marshal(&cmd.Cmd{
-		Name: cmd.Name_TAIL,
+		Name:        cmd.Name_TAIL,
+		QueryParams: q,
 	})
 	if err != nil {
 		return fmt.Errorf("marshal ping msg err: %w", err)

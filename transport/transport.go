@@ -24,12 +24,13 @@ const (
 )
 
 type Sub struct {
-	raddr    *net.UDPAddr
-	lastPing time.Time
+	raddr       *net.UDPAddr
+	lastPing    time.Time
+	queryParams *cmd.QueryParams
 }
 
 type Transporter struct {
-	Out         chan *[]byte
+	Out         chan *ProtoPair
 	subs        map[string]*Sub
 	mu          sync.Mutex
 	readSecret  []byte
@@ -44,9 +45,14 @@ type TransporterConfig struct {
 	AlarmSvc    *alarm.Svc
 }
 
+type ProtoPair struct {
+	Msg   *cmd.Msg
+	Bytes *[]byte
+}
+
 func NewTransporter(cfg *TransporterConfig) *Transporter {
 	return &Transporter{
-		Out:         make(chan *[]byte, 1),
+		Out:         make(chan *ProtoPair, 1),
 		subs:        make(map[string]*Sub),
 		mu:          sync.Mutex{},
 		readSecret:  []byte(cfg.ReadSecret),
@@ -127,7 +133,7 @@ func (t *Transporter) handlePacket(data []byte, conn *net.UDPConn, raddr *net.UD
 	case cmd.Name_WRITE:
 		t.handleWrite(c, raddr, sum, timeBytes, payload)
 	case cmd.Name_TAIL:
-		t.handleTail(conn, raddr, sum, timeBytes, payload)
+		t.handleTail(c, conn, raddr, sum, timeBytes, payload)
 	case cmd.Name_PING:
 		t.handlePing(raddr, sum, timeBytes, payload)
 	case cmd.Name_QUERY:
@@ -140,9 +146,23 @@ func (t *Transporter) writeToSubs(ctx context.Context, conn *net.UDPConn) {
 		select {
 		case <-ctx.Done():
 			return
-		case msg := <-t.Out:
+		case protoPair := <-t.Out:
 			for raddr, sub := range t.subs {
-				_, err := conn.WriteToUDP(*msg, sub.raddr)
+				if sub.queryParams != nil {
+					qEnv := sub.queryParams.GetEnv()
+					if qEnv != "" && qEnv != protoPair.Msg.GetEnv() {
+						continue
+					}
+					qSvc := sub.queryParams.GetSvc()
+					if qSvc != "" && qSvc != protoPair.Msg.GetSvc() {
+						continue
+					}
+					qFn := sub.queryParams.GetFn()
+					if qFn != "" && qFn != protoPair.Msg.GetFn() {
+						continue
+					}
+				}
+				_, err := conn.WriteToUDP(*protoPair.Bytes, sub.raddr)
 				if err != nil {
 					fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
 				}

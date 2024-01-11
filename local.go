@@ -32,12 +32,7 @@ func tailLogd(t *transport.Transporter, tailHost, tailReadSecret string) {
 	}
 	fmt.Println("tailing", tailHost)
 	for m := range msgs {
-		// pipe to tails
-		t.Out <- m
-		// write to buffer
+		// only write to buffer, implement more if necessary
 		buf.Write(m)
-		// don't pipe to alarm svc
-		// because this would require unmarshaling the payload
-		// only implement if later required.
 	}
 }

@@ -10,15 +10,17 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func (t *Transporter) handleTail(conn *net.UDPConn, raddr *net.UDPAddr, sum, timeBytes, payload []byte) error {
+func (t *Transporter) handleTail(c *cmd.Cmd, conn *net.UDPConn, raddr *net.UDPAddr, sum, timeBytes, payload []byte) error {
 	valid, err := auth.Verify(t.readSecret, sum, timeBytes, payload)
 	if !valid || err != nil {
 		return fmt.Errorf("%s unauthorised to tail: %w", raddr.IP.String(), err)
 	}
+
 	t.mu.Lock()
 	t.subs[raddr.AddrPort().String()] = &Sub{
-		raddr:    raddr,
-		lastPing: time.Now(),
+		raddr:       raddr,
+		lastPing:    time.Now(),
+		queryParams: c.GetQueryParams(),
 	}
 	t.mu.Unlock()
 	txt := "tailing logs..."
