@@ -20,6 +20,7 @@ import (
 const (
 	socketBufferSize      = 2048
 	socketBufferThreshold = 0.75
+	rateLimit             = time.Microsecond * 50
 )
 
 type Sub struct {
@@ -141,12 +142,11 @@ func (t *Transporter) writeToSubs(ctx context.Context, conn *net.UDPConn) {
 			return
 		case msg := <-t.Out:
 			for raddr, sub := range t.subs {
-				go func(msg *[]byte, sub *Sub, raddr string) {
-					_, err := conn.WriteToUDP(*msg, sub.raddr)
-					if err != nil {
-						fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
-					}
-				}(msg, sub, raddr)
+				_, err := conn.WriteToUDP(*msg, sub.raddr)
+				if err != nil {
+					fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
+				}
+				time.Sleep(rateLimit)
 			}
 		}
 	}
