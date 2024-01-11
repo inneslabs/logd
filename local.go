@@ -25,7 +25,7 @@ func tailLogd(t *transport.Transporter, tailHost, tailReadSecret string) {
 		fmt.Println("failed to get conn:", err)
 		return
 	}
-	msgs, err := tail.TailPlain(c, []byte(tailReadSecret))
+	msgs, err := tail.TailPlain(nil, c, []byte(tailReadSecret))
 	if err != nil {
 		fmt.Println("failed to get tail:", err)
 		return

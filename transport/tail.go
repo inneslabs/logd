@@ -15,7 +15,6 @@ func (t *Transporter) handleTail(c *cmd.Cmd, conn *net.UDPConn, raddr *net.UDPAd
 	if !valid || err != nil {
 		return fmt.Errorf("%s unauthorised to tail: %w", raddr.IP.String(), err)
 	}
-
 	t.mu.Lock()
 	t.subs[raddr.AddrPort().String()] = &Sub{
 		raddr:       raddr,

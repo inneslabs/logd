@@ -161,6 +161,10 @@ func (t *Transporter) writeToSubs(ctx context.Context, conn *net.UDPConn) {
 					if qFn != "" && qFn != protoPair.Msg.GetFn() {
 						continue
 					}
+					qLvl := sub.queryParams.GetLvl()
+					if qLvl != cmd.Lvl_LVL_UNKNOWN && qLvl > protoPair.Msg.GetLvl() {
+						continue
+					}
 				}
 				_, err := conn.WriteToUDP(*protoPair.Bytes, sub.raddr)
 				if err != nil {
