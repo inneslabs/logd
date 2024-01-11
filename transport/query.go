@@ -11,6 +11,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+// handleQuery reads from the head newest first
 func (t *Transporter) handleQuery(c *cmd.Cmd, conn *net.UDPConn, raddr *net.UDPAddr, sum, timeBytes, payload []byte) error {
 	valid, err := auth.Verify(t.readSecret, sum, timeBytes, payload)
 	if !valid || err != nil {
@@ -42,11 +43,12 @@ func (t *Transporter) handleQuery(c *cmd.Cmd, conn *net.UDPConn, raddr *net.UDPA
 	responseStatus := c.GetQueryParams().GetResponseStatus()
 	max := t.buf.Size()
 	var offset, found uint32
+	head := t.buf.Head()
 	for offset < max && found < limit {
-		payload := t.buf.ReadOneAhead(offset)
 		offset++
+		payload := t.buf.ReadOne((head - offset) % max)
 		if payload == nil {
-			continue
+			break
 		}
 		msg := &cmd.Msg{}
 		err = proto.Unmarshal(*payload, msg)

@@ -75,7 +75,7 @@ func (t *Transporter) Listen(ctx context.Context, laddr string) {
 	defer conn.Close()
 	fmt.Println("listening udp on", conn.LocalAddr())
 	go t.readFromConn(ctx, conn)
-	go t.writeToConn(ctx, conn)
+	go t.writeToSubs(ctx, conn)
 	go t.kickLateSubs(conn)
 	<-ctx.Done()
 	fmt.Println("stopped listening udp")
@@ -119,7 +119,7 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 	}
 }
 
-func (t *Transporter) writeToConn(ctx context.Context, conn *net.UDPConn) {
+func (t *Transporter) writeToSubs(ctx context.Context, conn *net.UDPConn) {
 	for {
 		select {
 		case <-ctx.Done():
