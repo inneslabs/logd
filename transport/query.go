@@ -76,19 +76,19 @@ func (t *Transporter) handleQuery(c *cmd.Cmd, conn *net.UDPConn, raddr *net.UDPA
 			continue
 		}
 		msgTxt := msg.GetTxt()
-		if txt != "" && msgTxt != "" && !strings.Contains(strings.ToLower(msgTxt), strings.ToLower(txt)) {
+		if txt != "" && !strings.Contains(strings.ToLower(msgTxt), strings.ToLower(txt)) {
 			continue
 		}
 		msgHttpMethod := msg.GetHttpMethod()
-		if httpMethod != cmd.HttpMethod_METHOD_UNKNOWN && msgHttpMethod != cmd.HttpMethod_METHOD_UNKNOWN && httpMethod != msgHttpMethod {
+		if httpMethod != cmd.HttpMethod_METHOD_UNKNOWN && httpMethod != msgHttpMethod {
 			continue
 		}
 		msgUrl := msg.GetUrl()
-		if url != "" && msgUrl != "" && !strings.HasPrefix(msgUrl, url) {
+		if url != "" && !strings.HasPrefix(msgUrl, url) {
 			continue
 		}
 		msgResponseStatus := msg.GetResponseStatus()
-		if responseStatus != 0 && msgResponseStatus != 0 && responseStatus != msgResponseStatus {
+		if responseStatus != 0 && responseStatus != msgResponseStatus {
 			continue
 		}
 		time.Sleep(rateLimit)

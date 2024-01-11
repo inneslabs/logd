@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
 	"time"
 
@@ -163,6 +164,14 @@ func (t *Transporter) writeToSubs(ctx context.Context, conn *net.UDPConn) {
 					}
 					qLvl := sub.queryParams.GetLvl()
 					if qLvl != cmd.Lvl_LVL_UNKNOWN && qLvl > protoPair.Msg.GetLvl() {
+						continue
+					}
+					qResponseStatus := sub.queryParams.GetResponseStatus()
+					if qResponseStatus != 0 && qResponseStatus != protoPair.Msg.GetResponseStatus() {
+						continue
+					}
+					qUrl := sub.queryParams.GetUrl()
+					if qUrl != "" && !strings.HasPrefix(protoPair.Msg.GetUrl(), qUrl) {
 						continue
 					}
 				}
