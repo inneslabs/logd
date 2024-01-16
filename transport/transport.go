@@ -15,13 +15,15 @@ import (
 	"github.com/swissinfo-ch/logd/auth"
 	"github.com/swissinfo-ch/logd/cmd"
 	"github.com/swissinfo-ch/logd/ring"
+	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
 )
 
 const (
 	socketBufferSize      = 2048
 	socketBufferThreshold = 0.75
-	rateLimit             = time.Microsecond * 50
+	rateLimitEvery        = time.Microsecond * 50
+	rateLimitBurst        = 10
 )
 
 type Sub struct {
@@ -32,8 +34,10 @@ type Sub struct {
 
 type Transporter struct {
 	Out         chan *ProtoPair
+	bufferPool  *sync.Pool
 	subs        map[string]*Sub
-	mu          sync.Mutex
+	subsMu      sync.RWMutex
+	subsLimiter *rate.Limiter
 	readSecret  []byte
 	writeSecret []byte
 	buf         *ring.RingBuffer
@@ -53,9 +57,16 @@ type ProtoPair struct {
 
 func NewTransporter(cfg *TransporterConfig) *Transporter {
 	return &Transporter{
-		Out:         make(chan *ProtoPair, 1),
+		Out: make(chan *ProtoPair, 1),
+		bufferPool: &sync.Pool{
+			New: func() interface{} {
+				b := make([]byte, socketBufferSize)
+				return &b
+			},
+		},
 		subs:        make(map[string]*Sub),
-		mu:          sync.Mutex{},
+		subsMu:      sync.RWMutex{},
+		subsLimiter: rate.NewLimiter(rate.Every(rateLimitEvery), rateLimitBurst),
 		readSecret:  []byte(cfg.ReadSecret),
 		writeSecret: []byte(cfg.WriteSecret),
 		buf:         cfg.Buf,
@@ -98,27 +109,31 @@ func (t *Transporter) Listen(ctx context.Context, laddr string) {
 }
 
 func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
-	var buf []byte
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			buf = make([]byte, socketBufferSize)
+			bufPtr := t.bufferPool.Get().(*[]byte)
+			buf := *bufPtr
 			conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
 			n, raddr, err := conn.ReadFromUDP(buf)
 			if err != nil {
+				t.bufferPool.Put(bufPtr)
 				continue
 			}
 			if n >= socketBufferSize*socketBufferThreshold {
 				fmt.Printf("warning: socket buffer is >= %f full\r\n", socketBufferThreshold)
 			}
-			go t.handlePacket(buf[:n], conn, raddr)
+			go t.handlePacket(buf[:n], conn, raddr, func() {
+				t.bufferPool.Put(bufPtr) // Return the buffer to the pool
+			})
 		}
 	}
 }
 
-func (t *Transporter) handlePacket(data []byte, conn *net.UDPConn, raddr *net.UDPAddr) {
+func (t *Transporter) handlePacket(data []byte, conn *net.UDPConn, raddr *net.UDPAddr, done func()) {
+	defer done()
 	sum, timeBytes, payload, err := auth.UnpackSignedData(data)
 	if err != nil {
 		fmt.Println("unpack msg err:", err)
@@ -148,39 +163,52 @@ func (t *Transporter) writeToSubs(ctx context.Context, conn *net.UDPConn) {
 		case <-ctx.Done():
 			return
 		case protoPair := <-t.Out:
+			t.subsMu.RLock()
 			for raddr, sub := range t.subs {
-				if sub.queryParams != nil {
-					qEnv := sub.queryParams.GetEnv()
-					if qEnv != "" && qEnv != protoPair.Msg.GetEnv() {
-						continue
-					}
-					qSvc := sub.queryParams.GetSvc()
-					if qSvc != "" && qSvc != protoPair.Msg.GetSvc() {
-						continue
-					}
-					qFn := sub.queryParams.GetFn()
-					if qFn != "" && qFn != protoPair.Msg.GetFn() {
-						continue
-					}
-					qLvl := sub.queryParams.GetLvl()
-					if qLvl != cmd.Lvl_LVL_UNKNOWN && qLvl > protoPair.Msg.GetLvl() {
-						continue
-					}
-					qResponseStatus := sub.queryParams.GetResponseStatus()
-					if qResponseStatus != 0 && qResponseStatus != protoPair.Msg.GetResponseStatus() {
-						continue
-					}
-					qUrl := sub.queryParams.GetUrl()
-					if qUrl != "" && !strings.HasPrefix(protoPair.Msg.GetUrl(), qUrl) {
-						continue
-					}
+				if !shouldSendToSub(sub, protoPair) {
+					continue
 				}
-				_, err := conn.WriteToUDP(*protoPair.Bytes, sub.raddr)
+				err := t.subsLimiter.Wait(ctx)
+				if err != nil {
+					fmt.Println("failed to wait for subs limiter:", err)
+					continue
+				}
+				_, err = conn.WriteToUDP(*protoPair.Bytes, sub.raddr)
 				if err != nil {
 					fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
 				}
-				time.Sleep(rateLimit)
 			}
+			t.subsMu.RUnlock()
 		}
 	}
+}
+
+func shouldSendToSub(sub *Sub, protoPair *ProtoPair) bool {
+	if sub.queryParams != nil {
+		qEnv := sub.queryParams.GetEnv()
+		if qEnv != "" && qEnv != protoPair.Msg.GetEnv() {
+			return false
+		}
+		qSvc := sub.queryParams.GetSvc()
+		if qSvc != "" && qSvc != protoPair.Msg.GetSvc() {
+			return false
+		}
+		qFn := sub.queryParams.GetFn()
+		if qFn != "" && qFn != protoPair.Msg.GetFn() {
+			return false
+		}
+		qLvl := sub.queryParams.GetLvl()
+		if qLvl != cmd.Lvl_LVL_UNKNOWN && qLvl > protoPair.Msg.GetLvl() {
+			return false
+		}
+		qResponseStatus := sub.queryParams.GetResponseStatus()
+		if qResponseStatus != 0 && qResponseStatus != protoPair.Msg.GetResponseStatus() {
+			return false
+		}
+		qUrl := sub.queryParams.GetUrl()
+		if qUrl != "" && !strings.HasPrefix(protoPair.Msg.GetUrl(), qUrl) {
+			return false
+		}
+	}
+	return true
 }

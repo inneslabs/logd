@@ -31,9 +31,9 @@ func (t *Transporter) kickLateSubs(conn *net.UDPConn) {
 
 // kickSub removes sub from map
 func (t *Transporter) kickSub(conn *net.UDPConn, sub *Sub, raddr string) {
-	t.mu.Lock()
+	t.subsMu.Lock()
 	delete(t.subs, raddr)
-	t.mu.Unlock()
+	t.subsMu.Unlock()
 	fmt.Printf("kicked %s, no ping received, timed out\r\n", raddr)
 	txt := "you've been kicked, ping timed out"
 	payload, err := proto.Marshal(&cmd.Msg{

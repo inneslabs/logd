@@ -13,11 +13,11 @@ func (t *Transporter) handlePing(raddr *net.UDPAddr, sum, timeBytes, payload []b
 	if !valid || err != nil {
 		return fmt.Errorf("%s unauthorised to tail: %w", raddr.IP.String(), err)
 	}
-	t.mu.Lock()
+	t.subsMu.Lock()
 	sub := t.subs[raddr.AddrPort().String()]
 	if sub != nil {
 		sub.lastPing = time.Now()
 	}
-	t.mu.Unlock()
+	t.subsMu.Unlock()
 	return nil
 }

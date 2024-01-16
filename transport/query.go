@@ -91,7 +91,6 @@ func (t *Transporter) handleQuery(c *cmd.Cmd, conn *net.UDPConn, raddr *net.UDPA
 		if responseStatus != 0 && responseStatus != msgResponseStatus {
 			continue
 		}
-		time.Sleep(rateLimit)
 		_, err = conn.WriteToUDP(*payload, raddr)
 		if err != nil {
 			fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
