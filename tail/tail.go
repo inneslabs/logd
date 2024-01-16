@@ -25,12 +25,12 @@ func TailMsg(q *cmd.QueryParams, conn net.Conn, readSecret []byte) (<-chan *cmd.
 	return out, nil
 }
 
-func TailPlain(q *cmd.QueryParams, conn net.Conn, readSecret []byte) (<-chan *[]byte, error) {
+func TailPlain(q *cmd.QueryParams, conn net.Conn, readSecret []byte) (<-chan []byte, error) {
 	err := sendTailCmd(q, conn, readSecret)
 	if err != nil {
 		return nil, fmt.Errorf("send tail cmd err: %w", err)
 	}
-	out := make(chan *[]byte)
+	out := make(chan []byte)
 	go readPlain(conn, out)
 	go ping(conn, readSecret)
 	return out, nil
@@ -72,15 +72,14 @@ func readMsg(conn net.Conn, out chan<- *cmd.Msg) {
 	}
 }
 
-func readPlain(conn net.Conn, out chan<- *[]byte) {
+func readPlain(conn net.Conn, out chan<- []byte) {
 	for {
 		buf := make([]byte, 2048)
 		n, err := conn.Read(buf)
 		if err != nil {
 			fmt.Printf("error reading from conn: %s\r\n", err)
 		}
-		slice := buf[:n]
-		out <- &slice
+		out <- buf[:n]
 	}
 }
 

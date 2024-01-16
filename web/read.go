@@ -55,7 +55,7 @@ func (s *Webserver) handleRead(w http.ResponseWriter, r *http.Request) {
 		offset += limit
 		e := &cmd.Msg{}
 		for _, i := range items {
-			err := proto.Unmarshal(*i, e)
+			err := proto.Unmarshal(i, e)
 			if err != nil {
 				fmt.Println("failed to unmarshal msg:", err)
 				continue

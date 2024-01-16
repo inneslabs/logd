@@ -43,14 +43,14 @@ func testWriteAndReadWithOffset(size, nWrites, offset int) bool {
 		buf := make([]byte, 32)
 		rand.Read(buf)
 		writes = append(writes, buf)
-		r.Write(&buf)
+		r.Write(buf)
 	}
 	items := r.Read(uint32(offset), uint32(nWrites))
 	equal := true
 	for i := 0; i < size; i++ {
 		a := items[i]
 		b := writes[(((len(writes)-1)-i)+offset)%len(writes)]
-		if !bytes.Equal(*a, b) {
+		if !bytes.Equal(a, b) {
 			equal = false
 			break
 		}
@@ -65,14 +65,14 @@ func testWriteAndRead(size, nWrites int) bool {
 		buf := make([]byte, 32)
 		rand.Read(buf)
 		writes = append(writes, buf)
-		r.Write(&buf)
+		r.Write(buf)
 	}
 	items := r.Read(0, uint32(nWrites))
 	equal := true
 	for i := 0; i < size; i++ {
 		a := items[i]
 		b := writes[(len(writes)-1)-i]
-		if !bytes.Equal(*a, b) {
+		if !bytes.Equal(a, b) {
 			equal = false
 			break
 		}

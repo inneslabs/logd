@@ -27,7 +27,7 @@ func (t *Transporter) handleWrite(c *cmd.Cmd, raddr *net.UDPAddr, sum, timeBytes
 		return fmt.Errorf("protobuf marshal msg err: %w", err)
 	}
 	// write to buffer
-	t.buf.Write(&msgBytes)
+	t.buf.Write(msgBytes)
 	// pipe to tails
 	t.Out <- &ProtoPair{
 		Msg:   c.Msg,

@@ -37,7 +37,7 @@ type Transporter struct {
 	bufferPool  *sync.Pool
 	subs        map[string]*Sub
 	subsMu      sync.RWMutex
-	subsLimiter *rate.Limiter
+	rateLimiter *rate.Limiter
 	readSecret  []byte
 	writeSecret []byte
 	buf         *ring.RingBuffer
@@ -66,7 +66,7 @@ func NewTransporter(cfg *TransporterConfig) *Transporter {
 		},
 		subs:        make(map[string]*Sub),
 		subsMu:      sync.RWMutex{},
-		subsLimiter: rate.NewLimiter(rate.Every(rateLimitEvery), rateLimitBurst),
+		rateLimiter: rate.NewLimiter(rate.Every(rateLimitEvery), rateLimitBurst),
 		readSecret:  []byte(cfg.ReadSecret),
 		writeSecret: []byte(cfg.WriteSecret),
 		buf:         cfg.Buf,
@@ -168,7 +168,7 @@ func (t *Transporter) writeToSubs(ctx context.Context, conn *net.UDPConn) {
 				if !shouldSendToSub(sub, protoPair) {
 					continue
 				}
-				err := t.subsLimiter.Wait(ctx)
+				err := t.rateLimiter.Wait(ctx)
 				if err != nil {
 					fmt.Println("failed to wait for subs limiter:", err)
 					continue

@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strings"
@@ -51,7 +52,7 @@ func (t *Transporter) handleQuery(c *cmd.Cmd, conn *net.UDPConn, raddr *net.UDPA
 			break
 		}
 		msg := &cmd.Msg{}
-		err = proto.Unmarshal(*payload, msg)
+		err = proto.Unmarshal(payload, msg)
 		if err != nil {
 			fmt.Println("query unmarshal protobuf err:", err)
 			continue
@@ -91,7 +92,12 @@ func (t *Transporter) handleQuery(c *cmd.Cmd, conn *net.UDPConn, raddr *net.UDPA
 		if responseStatus != 0 && responseStatus != msgResponseStatus {
 			continue
 		}
-		_, err = conn.WriteToUDP(*payload, raddr)
+		err := t.rateLimiter.Wait(context.TODO())
+		if err != nil {
+			fmt.Println("failed to wait for subs limiter:", err)
+			continue
+		}
+		_, err = conn.WriteToUDP(payload, raddr)
 		if err != nil {
 			fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
 		}

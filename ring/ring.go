@@ -10,7 +10,7 @@ import (
 type RingBuffer struct {
 	head   atomic.Uint32
 	size   uint32
-	values []*[]byte
+	values [][]byte
 	Writes atomic.Uint64
 }
 
@@ -23,7 +23,7 @@ const (
 func NewRingBuffer(size uint32) *RingBuffer {
 	r := &RingBuffer{
 		size:   size,
-		values: make([]*[]byte, size),
+		values: make([][]byte, size),
 	}
 	return r
 }
@@ -32,7 +32,7 @@ func (r *RingBuffer) Size() uint32 {
 	return r.size
 }
 
-func (r *RingBuffer) Write(data *[]byte) {
+func (r *RingBuffer) Write(data []byte) {
 	r.Writes.Add(one)
 	head := r.head.Load()
 	r.values[head] = data
@@ -40,11 +40,11 @@ func (r *RingBuffer) Write(data *[]byte) {
 }
 
 // Read returns limit of data
-func (r *RingBuffer) Read(offset, limit uint32) []*[]byte {
+func (r *RingBuffer) Read(offset, limit uint32) [][]byte {
 	if limit > r.size || limit < zero {
 		limit = r.size
 	}
-	output := make([]*[]byte, 0)
+	output := make([][]byte, 0)
 	reads := zero
 	head := r.head.Load()
 	index := (head + (r.size - 1) + offset) % r.size
@@ -66,6 +66,6 @@ func (r *RingBuffer) Head() uint32 {
 }
 
 // Returns the record {offset} slots ahead of head (oldest first)
-func (r *RingBuffer) ReadOne(index uint32) *[]byte {
+func (r *RingBuffer) ReadOne(index uint32) []byte {
 	return r.values[index%r.size]
 }
