@@ -52,7 +52,7 @@ type TransporterConfig struct {
 
 type ProtoPair struct {
 	Msg   *cmd.Msg
-	Bytes *[]byte
+	Bytes []byte
 }
 
 func NewTransporter(cfg *TransporterConfig) *Transporter {
@@ -173,7 +173,7 @@ func (t *Transporter) writeToSubs(ctx context.Context, conn *net.UDPConn) {
 					fmt.Println("failed to wait for subs limiter:", err)
 					continue
 				}
-				_, err = conn.WriteToUDP(*protoPair.Bytes, sub.raddr)
+				_, err = conn.WriteToUDP(protoPair.Bytes, sub.raddr)
 				if err != nil {
 					fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
 				}

@@ -31,7 +31,7 @@ func (t *Transporter) handleWrite(c *cmd.Cmd, raddr *net.UDPAddr, sum, timeBytes
 	// pipe to tails
 	t.Out <- &ProtoPair{
 		Msg:   c.Msg,
-		Bytes: &msgBytes,
+		Bytes: msgBytes,
 	}
 	// pipe to alarm svc
 	t.alarmSvc.In <- c.Msg
