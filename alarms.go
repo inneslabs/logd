@@ -10,7 +10,7 @@ import (
 	"github.com/swissinfo-ch/logd/cmd"
 )
 
-func prodWpErrors() *alarm.Alarm {
+func prodWpErrors(slackWebhook string) *alarm.Alarm {
 	return &alarm.Alarm{
 		Name: "prod/wp/error",
 		Match: func(m *cmd.Msg) bool {
@@ -36,7 +36,7 @@ func prodWpErrors() *alarm.Alarm {
 	}
 }
 
-func prodErrors() *alarm.Alarm {
+func prodErrors(slackWebhook string) *alarm.Alarm {
 	return &alarm.Alarm{
 		Name: "prod/error",
 		Match: func(m *cmd.Msg) bool {

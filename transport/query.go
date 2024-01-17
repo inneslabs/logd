@@ -13,7 +13,7 @@ import (
 )
 
 // handleQuery reads from the head newest first
-func (t *Transporter) handleQuery(c *cmd.Cmd, conn *net.UDPConn, raddr *net.UDPAddr, sum, timeBytes, payload []byte) error {
+func (t *Transporter) handleQuery(ctx context.Context, c *cmd.Cmd, conn *net.UDPConn, raddr *net.UDPAddr, sum, timeBytes, payload []byte) error {
 	valid, err := auth.Verify(t.readSecret, sum, timeBytes, payload)
 	if !valid || err != nil {
 		return fmt.Errorf("%s unauthorised to query: %w", raddr.IP.String(), err)
@@ -92,7 +92,7 @@ func (t *Transporter) handleQuery(c *cmd.Cmd, conn *net.UDPConn, raddr *net.UDPA
 		if responseStatus != 0 && responseStatus != msgResponseStatus {
 			continue
 		}
-		err := t.rateLimiter.Wait(context.TODO())
+		err := t.rateLimiter.Wait(ctx)
 		if err != nil {
 			fmt.Println("failed to wait for subs limiter:", err)
 			continue

@@ -4,6 +4,8 @@ Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
 package ring
 
 import (
+	"bufio"
+	"io"
 	"sync/atomic"
 )
 
@@ -28,32 +30,32 @@ func NewRingBuffer(size uint32) *RingBuffer {
 	return r
 }
 
-func (r *RingBuffer) Size() uint32 {
-	return r.size
+func (b *RingBuffer) Size() uint32 {
+	return b.size
 }
 
-func (r *RingBuffer) Write(data []byte) {
-	r.Writes.Add(one)
-	head := r.head.Load()
-	r.values[head] = data
-	r.head.Store((head + 1) % r.size)
+func (b *RingBuffer) Write(data []byte) {
+	b.Writes.Add(one)
+	head := b.head.Load()
+	b.values[head] = data
+	b.head.Store((head + 1) % b.size)
 }
 
 // Read returns limit of data
-func (r *RingBuffer) Read(offset, limit uint32) [][]byte {
-	if limit > r.size || limit < zero {
-		limit = r.size
+func (b *RingBuffer) Read(offset, limit uint32) [][]byte {
+	if limit > b.size || limit < zero {
+		limit = b.size
 	}
 	output := make([][]byte, 0)
 	reads := zero
-	head := r.head.Load()
-	index := (head + (r.size - 1) + offset) % r.size
+	head := b.head.Load()
+	index := (head + (b.size - 1) + offset) % b.size
 	for reads < limit {
-		if r.values[index] != nil {
-			output = append(output, r.values[index])
+		if b.values[index] != nil {
+			output = append(output, b.values[index])
 		}
 		if index == zero {
-			index = r.size
+			index = b.size
 		}
 		index--
 		reads++
@@ -61,11 +63,19 @@ func (r *RingBuffer) Read(offset, limit uint32) [][]byte {
 	return output
 }
 
-func (r *RingBuffer) Head() uint32 {
-	return r.head.Load()
+func (b *RingBuffer) Head() uint32 {
+	return b.head.Load()
 }
 
-// Returns the record {offset} slots ahead of head (oldest first)
-func (r *RingBuffer) ReadOne(index uint32) []byte {
-	return r.values[index%r.size]
+// Returns the record {index} slots ahead of head (oldest first)
+func (b *RingBuffer) ReadOne(index uint32) []byte {
+	return b.values[index%b.size]
+}
+
+func (b *RingBuffer) ScanFrom(r io.Reader) error {
+	s := bufio.NewScanner(r)
+	for s.Scan() {
+		b.Write(s.Bytes())
+	}
+	return s.Err()
 }

@@ -22,7 +22,7 @@ import (
 const (
 	socketBufferSize      = 2048
 	socketBufferThreshold = 0.75
-	rateLimitEvery        = time.Microsecond * 50
+	rateLimitEvery        = time.Microsecond * 100
 	rateLimitBurst        = 10
 )
 
@@ -125,14 +125,14 @@ func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
 			if n >= socketBufferSize*socketBufferThreshold {
 				fmt.Printf("warning: socket buffer is >= %f full\r\n", socketBufferThreshold)
 			}
-			go t.handlePacket(buf[:n], conn, raddr, func() {
+			go t.handlePacket(ctx, buf[:n], conn, raddr, func() {
 				t.bufferPool.Put(bufPtr) // Return the buffer to the pool
 			})
 		}
 	}
 }
 
-func (t *Transporter) handlePacket(data []byte, conn *net.UDPConn, raddr *net.UDPAddr, done func()) {
+func (t *Transporter) handlePacket(ctx context.Context, data []byte, conn *net.UDPConn, raddr *net.UDPAddr, done func()) {
 	defer done()
 	sum, timeBytes, payload, err := auth.UnpackSignedData(data)
 	if err != nil {
@@ -153,7 +153,7 @@ func (t *Transporter) handlePacket(data []byte, conn *net.UDPConn, raddr *net.UD
 	case cmd.Name_PING:
 		t.handlePing(raddr, sum, timeBytes, payload)
 	case cmd.Name_QUERY:
-		t.handleQuery(c, conn, raddr, sum, timeBytes, payload)
+		t.handleQuery(ctx, c, conn, raddr, sum, timeBytes, payload)
 	}
 }
 

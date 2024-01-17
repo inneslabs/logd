@@ -7,11 +7,12 @@ import (
 	"fmt"
 
 	"github.com/swissinfo-ch/logd/conn"
+	"github.com/swissinfo-ch/logd/ring"
 	"github.com/swissinfo-ch/logd/tail"
 	"github.com/swissinfo-ch/logd/transport"
 )
 
-func tailLogd(t *transport.Transporter, tailHost, tailReadSecret string) {
+func tailLogd(buf *ring.RingBuffer, t *transport.Transporter, tailHost, tailReadSecret string) {
 	if tailHost == "" {
 		return
 	}
