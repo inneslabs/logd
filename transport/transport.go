@@ -32,11 +32,11 @@ type Sub struct {
 }
 
 type Transporter struct {
-	Out         chan *ProtoPair
 	laddrPort   string
 	conn        *net.UDPConn
 	subs        map[string]*Sub
 	subsMu      sync.RWMutex
+	forSubs     chan *ProtoPair
 	rateLimiter *rate.Limiter
 	readSecret  []byte
 	writeSecret []byte
@@ -63,10 +63,10 @@ type ProtoPair struct {
 
 func NewTransporter(cfg *Config) *Transporter {
 	t := &Transporter{
-		Out:         make(chan *ProtoPair, 1),
 		laddrPort:   cfg.LaddrPort,
 		subs:        make(map[string]*Sub),
 		subsMu:      sync.RWMutex{},
+		forSubs:     make(chan *ProtoPair, 4), // small buffer helps a lot
 		rateLimiter: rate.NewLimiter(rate.Every(rateLimitEvery), rateLimitBurst),
 		readSecret:  []byte(cfg.ReadSecret),
 		writeSecret: []byte(cfg.WriteSecret),
@@ -86,6 +86,9 @@ func (t *Transporter) SetWriteSecret(secret []byte) {
 }
 
 func (t *Transporter) Listen(ctx context.Context) {
+	// not using ResolveUDPAddrFromAddrPort because
+	// we need to resolve fly-global-services
+	// TODO: optimize this
 	l, err := net.ResolveUDPAddr("udp", t.laddrPort)
 	if err != nil {
 		panic(fmt.Errorf("resolve laddr err: %w", err))
@@ -97,24 +100,26 @@ func (t *Transporter) Listen(ctx context.Context) {
 	defer t.conn.Close()
 	fmt.Println("listening udp on", t.conn.LocalAddr())
 
-	// one gopher reads packets
-	packets := make(chan *Packet)
+	// gophers read packets
+	packets := make(chan *Packet, 4)
+	//for i := 0; i < runtime.NumCPU(); i++ {
 	go func() {
-		fmt.Println("packet-reading gopher started")
+		fmt.Printf("packet-reading gopher started\n")
 		for {
 			t.readPacket(packets)
 		}
 	}()
+	//}
 
-	// some gophers handle packets
-	for i := 0; i < 10; i++ {
-		go func(i int) {
-			fmt.Printf("packet-handling gopher %d started\n", i+1)
-			for {
-				t.handlePacket(<-packets)
-			}
-		}(i)
-	}
+	// gophers handle packets
+	//for i := 0; i < runtime.NumCPU(); i++ {
+	go func() {
+		fmt.Printf("packet-handling gopher started\n")
+		for {
+			t.handlePacket(<-packets)
+		}
+	}()
+	//}
 
 	// one gopher writes to the subs
 	go t.writeToSubs()
@@ -122,7 +127,7 @@ func (t *Transporter) Listen(ctx context.Context) {
 	// one gopher kicks subs that don't ping
 	go t.kickLateSubs()
 
-	// wait for the party to end
+	// wait for the gopher party to end
 	<-ctx.Done()
 	fmt.Println("stopped listening udp")
 }
@@ -169,7 +174,7 @@ func (t *Transporter) handlePacket(packet *Packet) {
 
 func (t *Transporter) writeToSubs() {
 	for {
-		protoPair := <-t.Out
+		protoPair := <-t.forSubs
 		t.subsMu.RLock()
 		for raddr, sub := range t.subs {
 			if !shouldSendToSub(sub, protoPair) {

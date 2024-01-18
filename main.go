@@ -73,7 +73,6 @@ func main() {
 	}
 	go h.ServeHttp(httpLaddrPort)
 
-	fmt.Println("all routines started")
 	// wait for kill signal
 	<-ctx.Done()
 	fmt.Println("all routines ended")

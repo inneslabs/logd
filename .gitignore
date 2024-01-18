@@ -3,3 +3,4 @@ __debug_bin*
 out.json
 test.sh
 .vscode/launch.json
+logd

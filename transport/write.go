@@ -28,7 +28,7 @@ func (t *Transporter) handleWrite(c *cmd.Cmd, unpk *auth.Unpacked) error {
 	// write to buffer
 	t.buf.Write(msgBytes)
 	// pipe to tails
-	t.Out <- &ProtoPair{
+	t.forSubs <- &ProtoPair{
 		Msg:   c.Msg,
 		Bytes: msgBytes,
 	}

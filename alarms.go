@@ -14,16 +14,13 @@ func prodWpErrors(slackWebhook string) *alarm.Alarm {
 	return &alarm.Alarm{
 		Name: "prod/wp/error",
 		Match: func(m *cmd.Msg) bool {
-			if m.Env != "prod" {
+			if m.GetResponseStatus() != 200 {
 				return false
 			}
-			if m.Svc != "wp" {
+			if m.GetSvc() != "wp" {
 				return false
 			}
-			if m.ResponseStatus == nil {
-				return false
-			}
-			if *m.ResponseStatus != 200 {
+			if m.GetEnv() != "prod" {
 				return false
 			}
 			return true
@@ -40,13 +37,10 @@ func prodErrors(slackWebhook string) *alarm.Alarm {
 	return &alarm.Alarm{
 		Name: "prod/error",
 		Match: func(m *cmd.Msg) bool {
-			if m.Env != "prod" {
+			if m.GetLvl() != cmd.Lvl_ERROR {
 				return false
 			}
-			if m.Lvl == nil {
-				return false
-			}
-			if *m.Lvl != cmd.Lvl_ERROR {
+			if m.GetEnv() != "prod" {
 				return false
 			}
 			return true

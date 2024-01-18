@@ -12,9 +12,9 @@ import (
 )
 
 type Svc struct {
-	In        chan *cmd.Msg
+	In        chan *cmd.Msg // buffer doesn't help
+	triggered chan *Alarm   // buffer doesn't help
 	Alarms    map[string]*Alarm
-	triggered chan *Alarm
 	mu        sync.Mutex
 }
 
@@ -34,18 +34,15 @@ type Event struct {
 	Occurred time.Time
 }
 
-// number of routines matching messages
-var workerCount = 10
-
 func NewSvc() *Svc {
 	s := &Svc{
-		In:        make(chan *cmd.Msg, workerCount),
-		Alarms:    make(map[string]*Alarm),
+		In:        make(chan *cmd.Msg),
 		triggered: make(chan *Alarm),
+		Alarms:    make(map[string]*Alarm),
 	}
-	for w := 0; w < workerCount; w++ {
-		go s.matchMsgs()
-	}
+	// we need some gophers
+	// adding more gophers matching messages doesn't help
+	go s.matchMsgs()
 	go s.kickOldEvents()
 	go s.callActions()
 	return s
@@ -60,6 +57,7 @@ func (s *Svc) Set(al *Alarm) {
 }
 
 func (s *Svc) matchMsgs() {
+	fmt.Println("alarm-matching gopher started")
 	for msg := range s.In {
 		for _, al := range s.Alarms {
 			if !al.Match(msg) {
