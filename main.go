@@ -28,6 +28,7 @@ func main() {
 		writeSecret   = os.Getenv("WRITE_SECRET")
 		slackWebhook  = os.Getenv("SLACK_WEBHOOK")
 	)
+
 	// defaults
 	if httpLaddrPort == "" {
 		httpLaddrPort = ":6101"
@@ -44,13 +45,13 @@ func main() {
 	buf = ring.NewRingBuffer(uint32(bufferSize))
 	fmt.Printf("created ring buffer with %d slots\n", bufferSize)
 
-	// init root context
-	ctx := getCtx()
-
 	// init alarm svc
 	alarmSvc := alarm.NewSvc()
 	alarmSvc.Set(prodWpErrors(slackWebhook))
 	alarmSvc.Set(prodErrors(slackWebhook))
+
+	// init root context
+	ctx := getCtx()
 
 	// init udp listener
 	t := transport.NewTransporter(&transport.TransporterConfig{
@@ -59,7 +60,7 @@ func main() {
 		Buf:         buf,
 		AlarmSvc:    alarmSvc,
 	})
-	go t.Listen(ctx, udpLaddrPort)
+	go t.Listen(ctx)
 
 	// init webserver
 	h := &web.Webserver{

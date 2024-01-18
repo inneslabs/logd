@@ -33,6 +33,8 @@ type Sub struct {
 
 type Transporter struct {
 	Out         chan *ProtoPair
+	laddrPort   string
+	conn        *net.UDPConn
 	subs        map[string]*Sub
 	subsMu      sync.RWMutex
 	rateLimiter *rate.Limiter
@@ -42,6 +44,7 @@ type Transporter struct {
 	alarmSvc    *alarm.Svc
 }
 type TransporterConfig struct {
+	LaddrPort   string
 	ReadSecret  string
 	WriteSecret string
 	Buf         *ring.RingBuffer
@@ -54,8 +57,9 @@ type ProtoPair struct {
 }
 
 func NewTransporter(cfg *TransporterConfig) *Transporter {
-	return &Transporter{
+	t := &Transporter{
 		Out:         make(chan *ProtoPair, 1),
+		laddrPort:   cfg.LaddrPort,
 		subs:        make(map[string]*Sub),
 		subsMu:      sync.RWMutex{},
 		rateLimiter: rate.NewLimiter(rate.Every(rateLimitEvery), rateLimitBurst),
@@ -64,6 +68,8 @@ func NewTransporter(cfg *TransporterConfig) *Transporter {
 		buf:         cfg.Buf,
 		alarmSvc:    cfg.AlarmSvc,
 	}
+
+	return t
 }
 
 func (t *Transporter) SetReadSecret(secret []byte) {
@@ -74,46 +80,43 @@ func (t *Transporter) SetWriteSecret(secret []byte) {
 	t.writeSecret = secret
 }
 
-func (t *Transporter) Listen(ctx context.Context, laddrPort string) {
-	l, err := net.ResolveUDPAddr("udp", laddrPort)
+func (t *Transporter) Listen(ctx context.Context) {
+	l, err := net.ResolveUDPAddr("udp", t.laddrPort)
 	if err != nil {
 		panic(fmt.Errorf("resolve laddr err: %w", err))
 	}
-	///////////////////////////////////////////////////////////////
-	// TODO: put conn in Transporter //////////////////////////////
-	///////////////////////////////////////////////////////////////
-	conn, err := net.ListenUDP("udp", l)
+	t.conn, err = net.ListenUDP("udp", l)
 	if err != nil {
 		panic(fmt.Errorf("listen udp err: %w", err))
 	}
-	defer conn.Close()
-	fmt.Println("listening udp on", conn.LocalAddr())
-	go t.waitForPackets(ctx, conn)
-	go t.writeToSubs(ctx, conn)
-	go t.kickLateSubs(conn)
+	defer t.conn.Close()
+	fmt.Println("listening udp on", t.conn.LocalAddr())
+	go t.waitForPackets(ctx)
+	go t.writeToSubs(ctx)
+	go t.kickLateSubs()
 	<-ctx.Done()
 	fmt.Println("stopped listening udp")
 }
 
-func (t *Transporter) waitForPackets(ctx context.Context, conn *net.UDPConn) {
+func (t *Transporter) waitForPackets(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			t.readFromConn(ctx, conn)
+			t.readFromConn(ctx)
 		}
 	}
 }
 
-func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
+func (t *Transporter) readFromConn(ctx context.Context) {
 	buf := make([]byte, 2048)
-	conn.SetReadDeadline(time.Now().Add(time.Second))
-	n, raddrPort, err := conn.ReadFromUDPAddrPort(buf)
+	t.conn.SetReadDeadline(time.Now().Add(time.Second))
+	n, raddrPort, err := t.conn.ReadFromUDPAddrPort(buf)
 	if err != nil {
 		return
 	}
-	go t.handlePacket(ctx, buf[:n], conn, raddrPort)
+	go t.handlePacket(ctx, buf[:n], t.conn, raddrPort)
 }
 
 func (t *Transporter) handlePacket(ctx context.Context, data []byte, conn *net.UDPConn, raddrPort netip.AddrPort) {
@@ -143,7 +146,7 @@ func (t *Transporter) handlePacket(ctx context.Context, data []byte, conn *net.U
 	}
 }
 
-func (t *Transporter) writeToSubs(ctx context.Context, conn *net.UDPConn) {
+func (t *Transporter) writeToSubs(ctx context.Context) {
 	for {
 		select {
 		case <-ctx.Done():
@@ -155,7 +158,7 @@ func (t *Transporter) writeToSubs(ctx context.Context, conn *net.UDPConn) {
 					continue
 				}
 				t.rateLimiter.Wait(ctx)
-				_, err := conn.WriteToUDPAddrPort(protoPair.Bytes, sub.raddrPort)
+				_, err := t.conn.WriteToUDPAddrPort(protoPair.Bytes, sub.raddrPort)
 				if err != nil {
 					fmt.Printf("write udp err: (%s) %s\n", raddr, err)
 				}

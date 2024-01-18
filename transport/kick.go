@@ -17,11 +17,11 @@ const (
 	KickAfterMissingPings = 10
 )
 
-func (t *Transporter) kickLateSubs(conn *net.UDPConn) {
+func (t *Transporter) kickLateSubs() {
 	for {
 		for raddr, sub := range t.subs {
 			if sub.lastPing.Before(time.Now().Add(-(PingPeriod * KickAfterMissingPings))) {
-				t.kickSub(conn, sub, raddr)
+				t.kickSub(t.conn, sub, raddr)
 				return
 			}
 		}
