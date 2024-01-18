@@ -42,10 +42,7 @@ func NewLogger(cfg *LoggerConfig) (*Logger, error) {
 	if err != nil {
 		return nil, err
 	}
-	if len(addrs) == 0 {
-		return nil, err
-	}
-	conn, err := net.Dial("udp", addrs[0]+strconv.Itoa(cfg.Port))
+	conn, err := net.Dial("udp", addrs[0]+":"+strconv.Itoa(cfg.Port))
 	if err != nil {
 		return nil, err
 	}
