@@ -55,6 +55,7 @@ func main() {
 
 	// init udp listener
 	t := transport.NewTransporter(&transport.Config{
+		LaddrPort:   udpLaddrPort,
 		ReadSecret:  readSecret,
 		WriteSecret: writeSecret,
 		Buf:         buf,

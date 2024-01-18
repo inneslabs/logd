@@ -13,7 +13,6 @@ primary_region = "ams"
   strategy = "immediate"
 
 [env]
-  BUFFER_SIZE = "1000000"
   UDP_LADDRPORT = "fly-global-services:6102"
   # set secrets for
   # READ_SECRET
