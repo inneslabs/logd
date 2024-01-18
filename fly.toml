@@ -14,8 +14,7 @@ primary_region = "ams"
 
 [env]
   BUFFER_SIZE = "1000000"
-  HTTP_LADDR = ":6101"
-  UDP_LADDR = "fly-global-services:6102"
+  UDP_LADDRPORT = "fly-global-services:6102"
   # set secrets for
   # READ_SECRET
   # WRITE_SECRET

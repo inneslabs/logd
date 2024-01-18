@@ -48,11 +48,7 @@ var (
 )
 
 func init() {
-	var err error
-	totalMemory, err = readTotalMemory()
-	if err != nil {
-		fmt.Println("failed to read total memory:", err)
-	}
+	totalMemory, _ = readTotalMemory()
 }
 
 func (s *Webserver) handleInfo(w http.ResponseWriter, r *http.Request) {

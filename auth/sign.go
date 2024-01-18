@@ -36,6 +36,9 @@ func Sign(secret, payload []byte, t time.Time) ([]byte, error) {
 }
 
 func Verify(secret, sum, timeBytes, payload []byte) (bool, error) {
+	if len(secret) == 0 {
+		return true, nil
+	}
 	t, err := convertBytesToTime(timeBytes)
 	if err != nil {
 		return false, fmt.Errorf("convert bytes to time err: %w", err)

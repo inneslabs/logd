@@ -2,8 +2,10 @@ package transport
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
+	"net/netip"
 	"strings"
 	"time"
 
@@ -13,23 +15,10 @@ import (
 )
 
 // handleQuery reads from the head newest first
-func (t *Transporter) handleQuery(ctx context.Context, c *cmd.Cmd, conn *net.UDPConn, raddr *net.UDPAddr, sum, timeBytes, payload []byte) error {
+func (t *Transporter) handleQuery(ctx context.Context, c *cmd.Cmd, conn *net.UDPConn, raddrPort netip.AddrPort, sum, timeBytes, payload []byte) error {
 	valid, err := auth.Verify(t.readSecret, sum, timeBytes, payload)
 	if !valid || err != nil {
-		return fmt.Errorf("%s unauthorised to query: %w", raddr.IP.String(), err)
-	}
-	respTxt := "querying logs..."
-	payload, err = proto.Marshal(&cmd.Msg{
-		Fn:  "logd",
-		Lvl: cmd.Lvl_INFO.Enum(),
-		Txt: &respTxt,
-	})
-	if err != nil {
-		return fmt.Errorf("protobuf marshal err: %w", err)
-	}
-	_, err = conn.WriteToUDP(payload, raddr)
-	if err != nil {
-		return fmt.Errorf("write udp err: (%s) %s", raddr, err)
+		return errors.New("unauthorized")
 	}
 	limit := limit(c.GetQueryParams(), t.buf.Size())
 	tStart := tStart(c.GetQueryParams())
@@ -49,7 +38,7 @@ func (t *Transporter) handleQuery(ctx context.Context, c *cmd.Cmd, conn *net.UDP
 		offset++
 		payload := t.buf.ReadOne((head - offset) % max)
 		if payload == nil {
-			break
+			break // reached end of items in non-full buffer
 		}
 		msg := &cmd.Msg{}
 		err = proto.Unmarshal(payload, msg)
@@ -94,29 +83,27 @@ func (t *Transporter) handleQuery(ctx context.Context, c *cmd.Cmd, conn *net.UDP
 		}
 		err := t.rateLimiter.Wait(ctx)
 		if err != nil {
-			fmt.Println("failed to wait for subs limiter:", err)
-			continue
+			return err
 		}
-		_, err = conn.WriteToUDP(payload, raddr)
+		_, err = conn.WriteToUDPAddrPort(payload, raddrPort)
 		if err != nil {
-			fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
+			return err
 		}
 		found++
 	}
+	////////////////////////////////////////////////////////////////
+	// TODO: find better way to signal end /////////////////////////
+	////////////////////////////////////////////////////////////////
 	time.Sleep(time.Millisecond * 50) // ensure +END arrives last
 	end := "+END"
-	endPayload, err := proto.Marshal(&cmd.Msg{
+	endPayload, _ := proto.Marshal(&cmd.Msg{
 		Fn:  "logd",
 		Txt: &end,
 	})
+	_, err = conn.WriteToUDPAddrPort(endPayload, raddrPort)
 	if err != nil {
-		fmt.Printf("end msg proto marshal err: %s\r\n", err)
+		fmt.Println("write to udp err:", err)
 	}
-	_, err = conn.WriteToUDP(endPayload, raddr)
-	if err != nil {
-		fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
-	}
-	fmt.Println("query found", found)
 	return nil
 }
 

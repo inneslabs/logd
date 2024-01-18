@@ -23,11 +23,11 @@ type Webserver struct {
 	Started     time.Time
 }
 
-func (s *Webserver) ServeHttp(laddr string) {
+func (s *Webserver) ServeHttp(laddrPort string) {
 	go s.measureInfo()
 	http.Handle("/", http.HandlerFunc(s.handleRequest))
-	fmt.Println("listening http on " + laddr)
-	err := http.ListenAndServe(laddr, nil)
+	fmt.Println("listening http on " + laddrPort)
+	err := http.ListenAndServe(laddrPort, nil)
 	if err != nil {
 		fmt.Println("failed to start http server: " + err.Error())
 		os.Exit(1)

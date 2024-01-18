@@ -7,6 +7,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"net/netip"
 	"strings"
 	"sync"
 	"time"
@@ -20,21 +21,18 @@ import (
 )
 
 const (
-	socketBufferSize      = 2048
-	socketBufferThreshold = 0.75
-	rateLimitEvery        = time.Microsecond * 100
-	rateLimitBurst        = 10
+	rateLimitEvery = time.Microsecond * 100
+	rateLimitBurst = 10
 )
 
 type Sub struct {
-	raddr       *net.UDPAddr
+	raddrPort   netip.AddrPort
 	lastPing    time.Time
 	queryParams *cmd.QueryParams
 }
 
 type Transporter struct {
 	Out         chan *ProtoPair
-	bufferPool  *sync.Pool
 	subs        map[string]*Sub
 	subsMu      sync.RWMutex
 	rateLimiter *rate.Limiter
@@ -57,13 +55,7 @@ type ProtoPair struct {
 
 func NewTransporter(cfg *TransporterConfig) *Transporter {
 	return &Transporter{
-		Out: make(chan *ProtoPair, 1),
-		bufferPool: &sync.Pool{
-			New: func() interface{} {
-				b := make([]byte, socketBufferSize)
-				return &b
-			},
-		},
+		Out:         make(chan *ProtoPair, 1),
 		subs:        make(map[string]*Sub),
 		subsMu:      sync.RWMutex{},
 		rateLimiter: rate.NewLimiter(rate.Every(rateLimitEvery), rateLimitBurst),
@@ -82,58 +74,49 @@ func (t *Transporter) SetWriteSecret(secret []byte) {
 	t.writeSecret = secret
 }
 
-func (t *Transporter) Listen(ctx context.Context, laddr string) {
-	l, err := net.ResolveUDPAddr("udp", laddr)
+func (t *Transporter) Listen(ctx context.Context, laddrPort string) {
+	l, err := net.ResolveUDPAddr("udp", laddrPort)
 	if err != nil {
 		panic(fmt.Errorf("resolve laddr err: %w", err))
 	}
+	///////////////////////////////////////////////////////////////
+	// TODO: put conn in Transporter //////////////////////////////
+	///////////////////////////////////////////////////////////////
 	conn, err := net.ListenUDP("udp", l)
 	if err != nil {
 		panic(fmt.Errorf("listen udp err: %w", err))
 	}
-	err = conn.SetReadBuffer(socketBufferSize)
-	if err != nil {
-		panic(fmt.Errorf("set read buffer size err: %w", err))
-	}
-	err = conn.SetWriteBuffer(socketBufferSize)
-	if err != nil {
-		panic(fmt.Errorf("set write buffer size err: %w", err))
-	}
 	defer conn.Close()
 	fmt.Println("listening udp on", conn.LocalAddr())
-	go t.readFromConn(ctx, conn)
+	go t.waitForPackets(ctx, conn)
 	go t.writeToSubs(ctx, conn)
 	go t.kickLateSubs(conn)
 	<-ctx.Done()
 	fmt.Println("stopped listening udp")
 }
 
-func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
+func (t *Transporter) waitForPackets(ctx context.Context, conn *net.UDPConn) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 		default:
-			bufPtr := t.bufferPool.Get().(*[]byte)
-			buf := *bufPtr
-			conn.SetReadDeadline(time.Now().Add(100 * time.Millisecond))
-			n, raddr, err := conn.ReadFromUDP(buf)
-			if err != nil {
-				t.bufferPool.Put(bufPtr)
-				continue
-			}
-			if n >= socketBufferSize*socketBufferThreshold {
-				fmt.Printf("warning: socket buffer is >= %f full\r\n", socketBufferThreshold)
-			}
-			go t.handlePacket(ctx, buf[:n], conn, raddr, func() {
-				t.bufferPool.Put(bufPtr) // Return the buffer to the pool
-			})
+			t.readFromConn(ctx, conn)
 		}
 	}
 }
 
-func (t *Transporter) handlePacket(ctx context.Context, data []byte, conn *net.UDPConn, raddr *net.UDPAddr, done func()) {
-	defer done()
+func (t *Transporter) readFromConn(ctx context.Context, conn *net.UDPConn) {
+	buf := make([]byte, 2048)
+	conn.SetReadDeadline(time.Now().Add(time.Second))
+	n, raddrPort, err := conn.ReadFromUDPAddrPort(buf)
+	if err != nil {
+		return
+	}
+	go t.handlePacket(ctx, buf[:n], conn, raddrPort)
+}
+
+func (t *Transporter) handlePacket(ctx context.Context, data []byte, conn *net.UDPConn, raddrPort netip.AddrPort) {
 	sum, timeBytes, payload, err := auth.UnpackSignedData(data)
 	if err != nil {
 		fmt.Println("unpack msg err:", err)
@@ -147,13 +130,16 @@ func (t *Transporter) handlePacket(ctx context.Context, data []byte, conn *net.U
 	}
 	switch c.GetName() {
 	case cmd.Name_WRITE:
-		t.handleWrite(c, raddr, sum, timeBytes, payload)
+		err = t.handleWrite(c, sum, timeBytes, payload)
 	case cmd.Name_TAIL:
-		t.handleTail(c, conn, raddr, sum, timeBytes, payload)
+		err = t.handleTail(c, conn, raddrPort, sum, timeBytes, payload)
 	case cmd.Name_PING:
-		t.handlePing(raddr, sum, timeBytes, payload)
+		err = t.handlePing(raddrPort, sum, timeBytes, payload)
 	case cmd.Name_QUERY:
-		t.handleQuery(ctx, c, conn, raddr, sum, timeBytes, payload)
+		err = t.handleQuery(ctx, c, conn, raddrPort, sum, timeBytes, payload)
+	}
+	if err != nil {
+		fmt.Println("handle packet err:", err)
 	}
 }
 
@@ -168,14 +154,10 @@ func (t *Transporter) writeToSubs(ctx context.Context, conn *net.UDPConn) {
 				if !shouldSendToSub(sub, protoPair) {
 					continue
 				}
-				err := t.rateLimiter.Wait(ctx)
+				t.rateLimiter.Wait(ctx)
+				_, err := conn.WriteToUDPAddrPort(protoPair.Bytes, sub.raddrPort)
 				if err != nil {
-					fmt.Println("failed to wait for subs limiter:", err)
-					continue
-				}
-				_, err = conn.WriteToUDP(protoPair.Bytes, sub.raddr)
-				if err != nil {
-					fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
+					fmt.Printf("write udp err: (%s) %s\n", raddr, err)
 				}
 			}
 			t.subsMu.RUnlock()

@@ -6,20 +6,19 @@ package transport
 import (
 	"errors"
 	"fmt"
-	"net"
 
 	"github.com/swissinfo-ch/logd/auth"
 	"github.com/swissinfo-ch/logd/cmd"
 	"google.golang.org/protobuf/proto"
 )
 
-func (t *Transporter) handleWrite(c *cmd.Cmd, raddr *net.UDPAddr, sum, timeBytes, payload []byte) error {
+func (t *Transporter) handleWrite(c *cmd.Cmd, sum, timeBytes, payload []byte) error {
 	if c.Msg == nil {
 		return errors.New("msg is nil")
 	}
 	valid, err := auth.Verify(t.writeSecret, sum, timeBytes, payload)
 	if !valid || err != nil {
-		return fmt.Errorf("%s unauthorised to write: %w", raddr.IP.String(), err)
+		return errors.New("unauthorised to write")
 	}
 	// marshal msg
 	msgBytes, err := proto.Marshal(c.Msg)

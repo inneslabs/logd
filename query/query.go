@@ -4,6 +4,7 @@ Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
 package query
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"sync"
@@ -14,23 +15,13 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func QueryMsg(q *cmd.QueryParams, conn net.Conn, readSecret []byte) (<-chan *cmd.Msg, error) {
+func Query(q *cmd.QueryParams, conn net.Conn, readSecret []byte) (<-chan *cmd.Msg, error) {
 	err := writeRequest(q, conn, readSecret)
 	if err != nil {
 		return nil, err
 	}
 	out := make(chan *cmd.Msg)
-	go readMsg(conn, out)
-	return out, nil
-}
-
-func QueryBytes(q *cmd.QueryParams, conn net.Conn, readSecret []byte) (<-chan []byte, error) {
-	err := writeRequest(q, conn, readSecret)
-	if err != nil {
-		return nil, err
-	}
-	out := make(chan []byte)
-	go readBytes(conn, out)
+	go readMsgs(conn, out)
 	return out, nil
 }
 
@@ -53,38 +44,34 @@ func writeRequest(q *cmd.QueryParams, conn net.Conn, readSecret []byte) error {
 	return nil
 }
 
-func readMsg(conn net.Conn, out chan<- *cmd.Msg) {
+func readMsgs(conn net.Conn, out chan<- *cmd.Msg) {
+	pool := &sync.Pool{
+		New: func() interface{} {
+			return &bytes.Buffer{}
+		},
+	}
 	for {
-		buf := make([]byte, 2048)
-		n, err := conn.Read(buf)
+		m, err := readMsg(pool, conn)
 		if err != nil {
-			fmt.Printf("error reading from conn: %s\r\n", err)
-		}
-		m := &cmd.Msg{}
-		err = proto.Unmarshal(buf[:n], m)
-		if err != nil {
-			fmt.Println("unpack msg err:", err)
+			fmt.Println("failed to read msg:", err)
 			continue
 		}
 		out <- m
 	}
 }
 
-func readBytes(conn net.Conn, out chan<- []byte) {
-	pool := &sync.Pool{
-		New: func() interface{} {
-			b := make([]byte, 2048)
-			return &b
-		},
+func readMsg(pool *sync.Pool, conn net.Conn) (*cmd.Msg, error) {
+	buf := pool.Get().(*bytes.Buffer)
+	buf.Reset()
+	defer pool.Put(buf)
+	_, err := buf.ReadFrom(conn)
+	if err != nil {
+		return nil, err
 	}
-	for {
-		bufPtr := pool.Get().(*[]byte)
-		buf := *bufPtr
-		n, err := conn.Read(buf)
-		if err != nil {
-			fmt.Printf("error reading from conn: %s\r\n", err)
-		}
-		out <- buf[:n]
-		pool.Put(bufPtr)
+	m := &cmd.Msg{}
+	err = proto.Unmarshal(buf.Bytes(), m)
+	if err != nil {
+		return nil, err
 	}
+	return m, nil
 }

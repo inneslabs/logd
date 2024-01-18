@@ -25,17 +25,6 @@ func TailMsg(q *cmd.QueryParams, conn net.Conn, readSecret []byte) (<-chan *cmd.
 	return out, nil
 }
 
-func TailPlain(q *cmd.QueryParams, conn net.Conn, readSecret []byte) (<-chan []byte, error) {
-	err := sendTailCmd(q, conn, readSecret)
-	if err != nil {
-		return nil, fmt.Errorf("send tail cmd err: %w", err)
-	}
-	out := make(chan []byte)
-	go readPlain(conn, out)
-	go ping(conn, readSecret)
-	return out, nil
-}
-
 func sendTailCmd(q *cmd.QueryParams, conn net.Conn, readSecret []byte) error {
 	payload, err := proto.Marshal(&cmd.Cmd{
 		Name:        cmd.Name_TAIL,
@@ -56,30 +45,20 @@ func sendTailCmd(q *cmd.QueryParams, conn net.Conn, readSecret []byte) error {
 }
 
 func readMsg(conn net.Conn, out chan<- *cmd.Msg) {
+	buf := make([]byte, 2048)
 	for {
-		buf := make([]byte, 2048)
 		n, err := conn.Read(buf)
 		if err != nil {
-			fmt.Printf("error reading from conn: %s\r\n", err)
+			fmt.Printf("error reading from conn: %s\n", err)
 		}
 		m := &cmd.Msg{}
 		err = proto.Unmarshal(buf[:n], m)
+		buf = buf[:2048] // re-slice to max capacity
 		if err != nil {
 			fmt.Println("unpack msg err:", err)
 			continue
 		}
 		out <- m
-	}
-}
-
-func readPlain(conn net.Conn, out chan<- []byte) {
-	for {
-		buf := make([]byte, 2048)
-		n, err := conn.Read(buf)
-		if err != nil {
-			fmt.Printf("error reading from conn: %s\r\n", err)
-		}
-		out <- buf[:n]
 	}
 }
 

@@ -4,8 +4,6 @@ Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
 package ring
 
 import (
-	"bufio"
-	"io"
 	"sync/atomic"
 )
 
@@ -70,12 +68,4 @@ func (b *RingBuffer) Head() uint32 {
 // Returns the record {index} slots ahead of head (oldest first)
 func (b *RingBuffer) ReadOne(index uint32) []byte {
 	return b.values[index%b.size]
-}
-
-func (b *RingBuffer) ScanFrom(r io.Reader) error {
-	s := bufio.NewScanner(r)
-	for s.Scan() {
-		b.Write(s.Bytes())
-	}
-	return s.Err()
 }

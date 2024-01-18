@@ -4,7 +4,6 @@ Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
 package main
 
 import (
-	"bufio"
 	"context"
 	"fmt"
 	"os"
@@ -21,29 +20,32 @@ import (
 
 func main() {
 	var (
-		buf            *ring.RingBuffer
-		bufferSizeStr  = os.Getenv("BUFFER_SIZE")
-		httpLaddr      = os.Getenv("HTTP_LADDR")
-		udpLaddr       = os.Getenv("UDP_LADDR")
-		readSecret     = os.Getenv("READ_SECRET")
-		writeSecret    = os.Getenv("WRITE_SECRET")
-		slackWebhook   = os.Getenv("SLACK_WEBHOOK")
-		tailHost       = os.Getenv("TAIL_HOST")
-		tailReadSecret = os.Getenv("TAIL_READ_SECRET")
+		buf           *ring.RingBuffer
+		bufferSizeStr = os.Getenv("BUFFER_SIZE")
+		httpLaddrPort = os.Getenv("HTTP_LADDRPORT")
+		udpLaddrPort  = os.Getenv("UDP_LADDRPORT")
+		readSecret    = os.Getenv("READ_SECRET")
+		writeSecret   = os.Getenv("WRITE_SECRET")
+		slackWebhook  = os.Getenv("SLACK_WEBHOOK")
 	)
+	// defaults
+	if httpLaddrPort == "" {
+		httpLaddrPort = ":6101"
+	}
+	if udpLaddrPort == "" {
+		udpLaddrPort = ":6102"
+	}
 
 	// init ring buffer
 	bufferSize, err := strconv.ParseUint(bufferSizeStr, 10, 32)
 	if err != nil {
-		panic("BUFFER_SIZE must be an integer")
+		bufferSize = 1000000
 	}
 	buf = ring.NewRingBuffer(uint32(bufferSize))
-	fmt.Println("initialised buffer of size", bufferSize)
+	fmt.Printf("created ring buffer with %d slots\n", bufferSize)
 
 	// init root context
 	ctx := getCtx()
-
-	readFromStdin(ctx, buf)
 
 	// init alarm svc
 	alarmSvc := alarm.NewSvc()
@@ -57,7 +59,7 @@ func main() {
 		Buf:         buf,
 		AlarmSvc:    alarmSvc,
 	})
-	go t.Listen(ctx, udpLaddr)
+	go t.Listen(ctx, udpLaddrPort)
 
 	// init webserver
 	h := &web.Webserver{
@@ -67,10 +69,7 @@ func main() {
 		AlarmSvc:    alarmSvc,
 		Started:     time.Now(),
 	}
-	go h.ServeHttp(httpLaddr)
-
-	// maybe tail other instance for test data
-	go tailLogd(buf, t, tailHost, tailReadSecret)
+	go h.ServeHttp(httpLaddrPort)
 
 	fmt.Println("all routines started")
 	// wait for kill signal
@@ -82,9 +81,9 @@ func main() {
 func cancelOnKillSig(sigs chan os.Signal, cancel context.CancelFunc) {
 	switch <-sigs {
 	case syscall.SIGINT:
-		fmt.Println("\r\nreceived SIGINT")
+		fmt.Println("\nreceived SIGINT")
 	case syscall.SIGTERM:
-		fmt.Println("\r\nreceived SIGTERM")
+		fmt.Println("\nreceived SIGTERM")
 	}
 	cancel()
 }
@@ -96,21 +95,4 @@ func getCtx() context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 	go cancelOnKillSig(sigs, cancel)
 	return ctx
-}
-
-func readFromStdin(ctx context.Context, buf *ring.RingBuffer) {
-	i := make(chan []byte)
-	go func() {
-		reader := bufio.NewReader(os.Stdin)
-		msg, _ := reader.ReadBytes('\n')
-		i <- msg
-	}()
-	select {
-	case msg := <-i:
-		buf.Write(msg)
-	case <-time.After(time.Second):
-		fmt.Println("Timeout! No input received.")
-	case <-ctx.Done():
-		return
-	}
 }

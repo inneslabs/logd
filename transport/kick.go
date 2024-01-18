@@ -34,18 +34,14 @@ func (t *Transporter) kickSub(conn *net.UDPConn, sub *Sub, raddr string) {
 	t.subsMu.Lock()
 	delete(t.subs, raddr)
 	t.subsMu.Unlock()
-	fmt.Printf("kicked %s, no ping received, timed out\r\n", raddr)
+	fmt.Printf("kicked %s, no ping received, timed out\n", raddr)
 	txt := "you've been kicked, ping timed out"
-	payload, err := proto.Marshal(&cmd.Msg{
+	payload, _ := proto.Marshal(&cmd.Msg{
 		Fn:  "logd",
 		Txt: &txt,
 	})
+	_, err := conn.WriteToUDPAddrPort(payload, sub.raddrPort)
 	if err != nil {
-		fmt.Println("pack msg err:", err)
-		return
-	}
-	_, err = conn.WriteToUDP(payload, sub.raddr)
-	if err != nil {
-		fmt.Printf("write udp err: (%s) %s\r\n", raddr, err)
+		fmt.Println("write to udp err:", err)
 	}
 }
