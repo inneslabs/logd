@@ -54,7 +54,7 @@ func main() {
 	ctx := getCtx()
 
 	// init udp listener
-	t := transport.NewTransporter(&transport.TransporterConfig{
+	t := transport.NewTransporter(&transport.Config{
 		ReadSecret:  readSecret,
 		WriteSecret: writeSecret,
 		Buf:         buf,

@@ -43,7 +43,7 @@ type Transporter struct {
 	buf         *ring.RingBuffer
 	alarmSvc    *alarm.Svc
 }
-type TransporterConfig struct {
+type Config struct {
 	LaddrPort   string
 	ReadSecret  string
 	WriteSecret string
@@ -56,7 +56,7 @@ type ProtoPair struct {
 	Bytes []byte
 }
 
-func NewTransporter(cfg *TransporterConfig) *Transporter {
+func NewTransporter(cfg *Config) *Transporter {
 	t := &Transporter{
 		Out:         make(chan *ProtoPair, 1),
 		laddrPort:   cfg.LaddrPort,
