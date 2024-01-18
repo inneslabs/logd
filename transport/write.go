@@ -12,11 +12,11 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func (t *Transporter) handleWrite(c *cmd.Cmd, sum, timeBytes, payload []byte) error {
+func (t *Transporter) handleWrite(c *cmd.Cmd, unpk *auth.Unpacked) error {
 	if c.Msg == nil {
 		return errors.New("msg is nil")
 	}
-	valid, err := auth.Verify(t.writeSecret, sum, timeBytes, payload)
+	valid, err := auth.Verify(t.writeSecret, unpk)
 	if !valid || err != nil {
 		return errors.New("unauthorised to write")
 	}

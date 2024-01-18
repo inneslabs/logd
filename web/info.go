@@ -25,6 +25,7 @@ type Info struct {
 }
 
 type MachineInfo struct {
+	NumCpu     int     `json:"numCpu"`
 	MemTotalMB float64 `json:"memTotalMB"`
 	MemAllocMB float64 `json:"memAllocMB"`
 }
@@ -45,10 +46,12 @@ type AlarmStatus struct {
 var (
 	info        *Info
 	totalMemory float64
+	numCpu      int
 )
 
 func init() {
 	totalMemory, _ = readTotalMemory()
+	numCpu = runtime.NumCPU()
 }
 
 func (s *Webserver) handleInfo(w http.ResponseWriter, r *http.Request) {
@@ -72,6 +75,7 @@ func (s *Webserver) measureInfo() {
 		info = &Info{
 			Uptime: time.Since(s.Started).String(),
 			Machine: &MachineInfo{
+				NumCpu:     numCpu,
 				MemAllocMB: float64(memStats.Alloc) / 1024 / 1024,
 				MemTotalMB: totalMemory,
 			},

@@ -51,6 +51,11 @@ type Config struct {
 	AlarmSvc    *alarm.Svc
 }
 
+type Packet struct {
+	Data      []byte
+	RaddrPort netip.AddrPort
+}
+
 type ProtoPair struct {
 	Msg   *cmd.Msg
 	Bytes []byte
@@ -91,80 +96,92 @@ func (t *Transporter) Listen(ctx context.Context) {
 	}
 	defer t.conn.Close()
 	fmt.Println("listening udp on", t.conn.LocalAddr())
-	go t.waitForPackets(ctx)
-	go t.writeToSubs(ctx)
+
+	// one gopher reads packets
+	packets := make(chan *Packet)
+	go func() {
+		fmt.Println("packet-reading gopher started")
+		for {
+			t.readPacket(packets)
+		}
+	}()
+
+	// some gophers handle packets
+	for i := 0; i < 10; i++ {
+		go func(i int) {
+			fmt.Printf("packet-handling gopher %d started\n", i+1)
+			for {
+				t.handlePacket(<-packets)
+			}
+		}(i)
+	}
+
+	// one gopher writes to the subs
+	go t.writeToSubs()
+
+	// one gopher kicks subs that don't ping
 	go t.kickLateSubs()
+
+	// wait for the party to end
 	<-ctx.Done()
 	fmt.Println("stopped listening udp")
 }
 
-func (t *Transporter) waitForPackets(ctx context.Context) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-		default:
-			t.readFromConn(ctx)
-		}
-	}
-}
-
-func (t *Transporter) readFromConn(ctx context.Context) {
+func (t *Transporter) readPacket(packets chan<- *Packet) {
 	buf := make([]byte, 2048)
 	t.conn.SetReadDeadline(time.Now().Add(time.Second))
 	n, raddrPort, err := t.conn.ReadFromUDPAddrPort(buf)
 	if err != nil {
 		return
 	}
-	go t.handlePacket(ctx, buf[:n], t.conn, raddrPort)
+	packets <- &Packet{
+		Data:      buf[:n],
+		RaddrPort: raddrPort,
+	}
 }
 
-func (t *Transporter) handlePacket(ctx context.Context, data []byte, conn *net.UDPConn, raddrPort netip.AddrPort) {
-	sum, timeBytes, payload, err := auth.UnpackSignedData(data)
+func (t *Transporter) handlePacket(packet *Packet) {
+	unpk, err := auth.UnpackSignedData(packet.Data)
 	if err != nil {
 		fmt.Println("unpack msg err:", err)
 		return
 	}
 	c := &cmd.Cmd{}
-	err = proto.Unmarshal(payload, c)
+	err = proto.Unmarshal(unpk.Payload, c)
 	if err != nil {
 		fmt.Println("protobuf unmarshal err:", err)
 		return
 	}
 	switch c.GetName() {
 	case cmd.Name_WRITE:
-		err = t.handleWrite(c, sum, timeBytes, payload)
+		err = t.handleWrite(c, unpk)
 	case cmd.Name_TAIL:
-		err = t.handleTail(c, conn, raddrPort, sum, timeBytes, payload)
+		err = t.handleTail(c, packet.RaddrPort, unpk)
 	case cmd.Name_PING:
-		err = t.handlePing(raddrPort, sum, timeBytes, payload)
+		err = t.handlePing(packet.RaddrPort, unpk)
 	case cmd.Name_QUERY:
-		err = t.handleQuery(ctx, c, conn, raddrPort, sum, timeBytes, payload)
+		err = t.handleQuery(c, packet.RaddrPort, unpk)
 	}
 	if err != nil {
 		fmt.Println("handle packet err:", err)
 	}
 }
 
-func (t *Transporter) writeToSubs(ctx context.Context) {
+func (t *Transporter) writeToSubs() {
 	for {
-		select {
-		case <-ctx.Done():
-			return
-		case protoPair := <-t.Out:
-			t.subsMu.RLock()
-			for raddr, sub := range t.subs {
-				if !shouldSendToSub(sub, protoPair) {
-					continue
-				}
-				t.rateLimiter.Wait(ctx)
-				_, err := t.conn.WriteToUDPAddrPort(protoPair.Bytes, sub.raddrPort)
-				if err != nil {
-					fmt.Printf("write udp err: (%s) %s\n", raddr, err)
-				}
+		protoPair := <-t.Out
+		t.subsMu.RLock()
+		for raddr, sub := range t.subs {
+			if !shouldSendToSub(sub, protoPair) {
+				continue
 			}
-			t.subsMu.RUnlock()
+			t.rateLimiter.Wait(context.Background())
+			_, err := t.conn.WriteToUDPAddrPort(protoPair.Bytes, sub.raddrPort)
+			if err != nil {
+				fmt.Printf("write udp err: (%s) %s\n", raddr, err)
+			}
 		}
+		t.subsMu.RUnlock()
 	}
 }
 

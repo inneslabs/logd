@@ -29,11 +29,11 @@ func TestSignAndVerify(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	sum, timeBytes, payload, err := UnpackSignedData(signed)
+	unpk, err := UnpackSignedData(signed)
 	if err != nil {
 		t.FailNow()
 	}
-	valid, err := Verify(sec, sum, timeBytes, payload)
+	valid, err := Verify(sec, unpk)
 	if !valid || err != nil {
 		t.FailNow()
 	}
@@ -56,11 +56,11 @@ func TestSignAndVerifyInvalid(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	sum, timeBytes, payload, err := UnpackSignedData(signed)
+	unpk, err := UnpackSignedData(signed)
 	if err != nil {
 		t.FailNow()
 	}
-	valid, err := Verify(sec, sum, timeBytes, payload)
+	valid, err := Verify(sec, unpk)
 	if valid || err == nil {
 		t.FailNow()
 	}

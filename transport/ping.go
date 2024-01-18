@@ -8,8 +8,8 @@ import (
 	"github.com/swissinfo-ch/logd/auth"
 )
 
-func (t *Transporter) handlePing(raddrPort netip.AddrPort, sum, timeBytes, payload []byte) error {
-	valid, err := auth.Verify(t.readSecret, sum, timeBytes, payload)
+func (t *Transporter) handlePing(raddrPort netip.AddrPort, unpk *auth.Unpacked) error {
+	valid, err := auth.Verify(t.readSecret, unpk)
 	if !valid || err != nil {
 		return fmt.Errorf("%s unauthorised to tail: %w", raddrPort.String(), err)
 	}

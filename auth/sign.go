@@ -35,11 +35,11 @@ func Sign(secret, payload []byte, t time.Time) ([]byte, error) {
 	return append(signed, payload...), nil
 }
 
-func Verify(secret, sum, timeBytes, payload []byte) (bool, error) {
+func Verify(secret []byte, unpk *Unpacked) (bool, error) {
 	if len(secret) == 0 {
 		return true, nil
 	}
-	t, err := convertBytesToTime(timeBytes)
+	t, err := convertBytesToTime(unpk.TimeBytes)
 	if err != nil {
 		return false, fmt.Errorf("convert bytes to time err: %w", err)
 	}
@@ -47,9 +47,9 @@ func Verify(secret, sum, timeBytes, payload []byte) (bool, error) {
 		t.Before(time.Now().Add(-sigTtl)) {
 		return false, errors.New("time is outside of threshold")
 	}
-	data := append(secret, timeBytes...)
-	data = append(data, payload...)
+	data := append(secret, unpk.TimeBytes...)
+	data = append(data, unpk.Payload...)
 	h := sha256.Sum256(data)
 	mySum := h[:hashLen]
-	return bytes.Equal(sum, mySum), nil
+	return bytes.Equal(unpk.Sum, mySum), nil
 }

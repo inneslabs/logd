@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"net"
 	"net/netip"
 	"strings"
 	"time"
@@ -15,8 +14,8 @@ import (
 )
 
 // handleQuery reads from the head newest first
-func (t *Transporter) handleQuery(ctx context.Context, c *cmd.Cmd, conn *net.UDPConn, raddrPort netip.AddrPort, sum, timeBytes, payload []byte) error {
-	valid, err := auth.Verify(t.readSecret, sum, timeBytes, payload)
+func (t *Transporter) handleQuery(c *cmd.Cmd, raddrPort netip.AddrPort, unpk *auth.Unpacked) error {
+	valid, err := auth.Verify(t.readSecret, unpk)
 	if !valid || err != nil {
 		return errors.New("unauthorized")
 	}
@@ -81,11 +80,11 @@ func (t *Transporter) handleQuery(ctx context.Context, c *cmd.Cmd, conn *net.UDP
 		if responseStatus != 0 && responseStatus != msgResponseStatus {
 			continue
 		}
-		err := t.rateLimiter.Wait(ctx)
+		err := t.rateLimiter.Wait(context.Background())
 		if err != nil {
 			return err
 		}
-		_, err = conn.WriteToUDPAddrPort(payload, raddrPort)
+		_, err = t.conn.WriteToUDPAddrPort(payload, raddrPort)
 		if err != nil {
 			return err
 		}
@@ -100,7 +99,7 @@ func (t *Transporter) handleQuery(ctx context.Context, c *cmd.Cmd, conn *net.UDP
 		Fn:  "logd",
 		Txt: &end,
 	})
-	_, err = conn.WriteToUDPAddrPort(endPayload, raddrPort)
+	_, err = t.conn.WriteToUDPAddrPort(endPayload, raddrPort)
 	if err != nil {
 		fmt.Println("write to udp err:", err)
 	}
