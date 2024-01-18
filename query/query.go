@@ -4,10 +4,8 @@ Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
 package query
 
 import (
-	"bytes"
 	"fmt"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/swissinfo-ch/logd/auth"
@@ -45,13 +43,9 @@ func writeRequest(q *cmd.QueryParams, conn net.Conn, readSecret []byte) error {
 }
 
 func readMsgs(conn net.Conn, out chan<- *cmd.Msg) {
-	pool := &sync.Pool{
-		New: func() interface{} {
-			return &bytes.Buffer{}
-		},
-	}
+	buf := make([]byte, 2048)
 	for {
-		m, err := readMsg(pool, conn)
+		m, err := readMsg(buf, conn)
 		if err != nil {
 			fmt.Println("failed to read msg:", err)
 			continue
@@ -60,16 +54,14 @@ func readMsgs(conn net.Conn, out chan<- *cmd.Msg) {
 	}
 }
 
-func readMsg(pool *sync.Pool, conn net.Conn) (*cmd.Msg, error) {
-	buf := pool.Get().(*bytes.Buffer)
-	buf.Reset()
-	defer pool.Put(buf)
-	_, err := buf.ReadFrom(conn)
+func readMsg(buf []byte, conn net.Conn) (*cmd.Msg, error) {
+	buf = buf[:2048] // re-slice to max capacity
+	n, err := conn.Read(buf)
 	if err != nil {
 		return nil, err
 	}
 	m := &cmd.Msg{}
-	err = proto.Unmarshal(buf.Bytes(), m)
+	err = proto.Unmarshal(buf[:n], m)
 	if err != nil {
 		return nil, err
 	}
