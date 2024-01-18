@@ -21,12 +21,12 @@ import (
 func main() {
 	var (
 		buf           *ring.RingBuffer
-		bufferSizeStr = os.Getenv("BUFFER_SIZE")
-		httpLaddrPort = os.Getenv("HTTP_LADDRPORT")
-		udpLaddrPort  = os.Getenv("UDP_LADDRPORT")
-		readSecret    = os.Getenv("READ_SECRET")
-		writeSecret   = os.Getenv("WRITE_SECRET")
-		slackWebhook  = os.Getenv("SLACK_WEBHOOK")
+		bufferSizeStr = os.Getenv("LOGD_BUFFER_SIZE")
+		httpLaddrPort = os.Getenv("LOGD_HTTP_LADDRPORT")
+		udpLaddrPort  = os.Getenv("LOGD_UDP_LADDRPORT")
+		readSecret    = os.Getenv("LOGD_READ_SECRET")
+		writeSecret   = os.Getenv("LOGD_WRITE_SECRET")
+		slackWebhook  = os.Getenv("LOGD_SLACK_WEBHOOK")
 	)
 
 	// defaults
