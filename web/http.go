@@ -23,6 +23,7 @@ type HttpSvc struct {
 	alarmSvc    *alarm.Svc
 	started     time.Time
 	rateLimiter *rate.Limiter
+	info        *Info
 }
 
 type Config struct {

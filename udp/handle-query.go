@@ -13,14 +13,16 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-// handleQuery reads from the head newest first
-func (svc *UdpSvc) handleQuery(c *cmd.Cmd, raddrPort netip.AddrPort, unpk *auth.Unpacked) error {
+const hardLimit = 1000
+
+func (svc *UdpSvc) handleQuery(c *cmd.Cmd, raddr netip.AddrPort, unpk *auth.Unpacked) error {
 	valid, err := auth.Verify(svc.readSecret, unpk)
 	if !valid || err != nil {
 		return errors.New("unauthorized")
 	}
 	svc.queryRateLimiter.Wait(context.TODO())
-	limit := limit(c.GetQueryParams(), svc.buf.Size())
+	offset := c.GetQueryParams().GetOffset()
+	limit := limit(c.GetQueryParams().GetLimit())
 	tStart := tStart(c.GetQueryParams())
 	tEnd := tEnd(c.GetQueryParams())
 	env := c.GetQueryParams().GetEnv()
@@ -32,7 +34,7 @@ func (svc *UdpSvc) handleQuery(c *cmd.Cmd, raddrPort netip.AddrPort, unpk *auth.
 	url := c.GetQueryParams().GetUrl()
 	responseStatus := c.GetQueryParams().GetResponseStatus()
 	max := svc.buf.Size()
-	var offset, found uint32
+	var found uint32
 	head := svc.buf.Head()
 	for offset < max && found < limit {
 		offset++
@@ -85,38 +87,22 @@ func (svc *UdpSvc) handleQuery(c *cmd.Cmd, raddrPort netip.AddrPort, unpk *auth.
 		if err != nil {
 			return err
 		}
-		_, err = svc.conn.WriteToUDPAddrPort(payload, raddrPort)
+		_, err = svc.conn.WriteToUDPAddrPort(payload, raddr)
 		if err != nil {
 			return err
 		}
 		found++
 	}
-	////////////////////////////////////////////////////////////////
-	// TODO: find better way to signal end /////////////////////////
-	////////////////////////////////////////////////////////////////
 	time.Sleep(time.Millisecond * 50) // ensure +END arrives last
-	end := "+END"
-	endPayload, _ := proto.Marshal(&cmd.Msg{
-		Fn:  "logd",
-		Txt: &end,
-	})
-	_, err = svc.conn.WriteToUDPAddrPort(endPayload, raddrPort)
-	if err != nil {
-		fmt.Println("write to udp err:", err)
-	}
+	svc.reply("+END", raddr)
 	return nil
 }
 
-func limit(q *cmd.QueryParams, bufSize uint32) uint32 {
-	if q == nil {
-		return bufSize
+func limit(qLimit uint32) uint32 {
+	if qLimit != 0 && qLimit < hardLimit {
+		return qLimit
 	}
-	var limit uint32 = bufSize
-	qLimit := q.GetLimit()
-	if qLimit != 0 && qLimit < bufSize {
-		limit = qLimit
-	}
-	return limit
+	return hardLimit
 }
 
 func tStart(q *cmd.QueryParams) *time.Time {

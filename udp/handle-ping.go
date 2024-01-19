@@ -8,13 +8,13 @@ import (
 	"github.com/swissinfo-ch/logd/auth"
 )
 
-func (svc *UdpSvc) handlePing(raddrPort netip.AddrPort, unpk *auth.Unpacked) error {
+func (svc *UdpSvc) handlePing(raddr netip.AddrPort, unpk *auth.Unpacked) error {
 	valid, err := auth.Verify(svc.readSecret, unpk)
 	if !valid || err != nil {
-		return fmt.Errorf("%s unauthorised to tail: %w", raddrPort.String(), err)
+		return fmt.Errorf("%s unauthorised to tail: %w", raddr.String(), err)
 	}
 	svc.subsMu.Lock()
-	sub := svc.subs[raddrPort.String()]
+	sub := svc.subs[raddr.String()]
 	if sub != nil {
 		sub.lastPing = time.Now()
 	}

@@ -31,17 +31,18 @@ message Msg {
 }
 
 message QueryParams {
-  optional uint32 limit = 1;
-  optional google.protobuf.Timestamp tStart = 2;
-  optional google.protobuf.Timestamp tEnd = 3;
-  optional string env = 4;
-  optional string svc = 5;
-  optional string fn = 6;
-  optional Lvl lvl = 7;
-  optional string txt = 8;
-  optional HttpMethod httpMethod = 9;
-  optional string url = 10;
-  optional int32 responseStatus = 11;
+  optional uint32 offset = 1;
+  optional uint32 limit = 2;
+  optional google.protobuf.Timestamp tStart = 3;
+  optional google.protobuf.Timestamp tEnd = 4;
+  optional string env = 5;
+  optional string svc = 6;
+  optional string fn = 7;
+  optional Lvl lvl = 8;
+  optional string txt = 9;
+  optional HttpMethod httpMethod = 10;
+  optional string url = 11;
+  optional int32 responseStatus = 12;
 }
 
 enum Lvl {

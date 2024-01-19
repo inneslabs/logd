@@ -47,13 +47,13 @@ func sendTailCmd(q *cmd.QueryParams, conn net.Conn, readSecret []byte) error {
 func readMsg(conn net.Conn, out chan<- *cmd.Msg) {
 	buf := make([]byte, 2048)
 	for {
+		buf = buf[:2048] // re-slice to max capacity
 		n, err := conn.Read(buf)
 		if err != nil {
 			fmt.Printf("error reading from conn: %s\n", err)
 		}
 		m := &cmd.Msg{}
 		err = proto.Unmarshal(buf[:n], m)
-		buf = buf[:2048] // re-slice to max capacity
 		if err != nil {
 			fmt.Println("unpack msg err:", err)
 			continue

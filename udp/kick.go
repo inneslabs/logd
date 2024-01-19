@@ -11,7 +11,7 @@ import (
 
 const (
 	PingPeriod            = time.Second
-	kickAfterMissingPings = 10
+	kickAfterMissingPings = 5
 )
 
 func (svc *UdpSvc) kickLateSubs() {
@@ -32,5 +32,5 @@ func (svc *UdpSvc) kickSub(conn *net.UDPConn, sub *Sub, raddr string) {
 	delete(svc.subs, raddr)
 	svc.subsMu.Unlock()
 	fmt.Printf("kicked %s\n", raddr)
-	svc.reply("kick", sub.raddrPort)
+	svc.reply("kick", sub.raddr)
 }

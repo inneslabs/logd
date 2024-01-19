@@ -47,14 +47,14 @@ type Config struct {
 }
 
 type Sub struct {
-	raddrPort   netip.AddrPort
+	raddr       netip.AddrPort
 	lastPing    time.Time
 	queryParams *cmd.QueryParams
 }
 
 type Packet struct {
-	Data      []byte
-	RaddrPort netip.AddrPort
+	Data  []byte
+	Raddr netip.AddrPort
 }
 
 type ProtoPair struct {
@@ -78,9 +78,6 @@ func NewSvc(cfg *Config) *UdpSvc {
 }
 
 func (svc *UdpSvc) Listen(ctx context.Context) {
-	// not using ResolveUDPAddrFromAddrPort because
-	// we need to resolve fly-global-services
-	// TODO: optimize this
 	l, err := net.ResolveUDPAddr("udp", svc.laddrPort)
 	if err != nil {
 		panic(fmt.Errorf("resolve laddr err: %w", err))
@@ -92,7 +89,7 @@ func (svc *UdpSvc) Listen(ctx context.Context) {
 	defer svc.conn.Close()
 	fmt.Println("listening udp on", svc.conn.LocalAddr())
 
-	// gophers read packets
+	// one gopher reads packets
 	packets := make(chan *Packet, 4)
 	go func() {
 		fmt.Printf("packet-reading gopher started\n")
@@ -101,7 +98,7 @@ func (svc *UdpSvc) Listen(ctx context.Context) {
 		}
 	}()
 
-	// gophers handle packets
+	// one gopher handles packets
 	go func() {
 		fmt.Printf("packet-handling gopher started\n")
 		for {
@@ -121,15 +118,14 @@ func (svc *UdpSvc) Listen(ctx context.Context) {
 }
 
 func (svc *UdpSvc) readPacket(packets chan<- *Packet) {
-	buf := make([]byte, 2048)
-	svc.conn.SetReadDeadline(time.Now().Add(time.Second))
-	n, raddrPort, err := svc.conn.ReadFromUDPAddrPort(buf)
+	buf := make([]byte, 1024)
+	n, raddr, err := svc.conn.ReadFromUDPAddrPort(buf)
 	if err != nil {
 		return
 	}
 	packets <- &Packet{
-		Data:      buf[:n],
-		RaddrPort: raddrPort,
+		Data:  buf[:n],
+		Raddr: raddr,
 	}
 }
 
@@ -148,11 +144,11 @@ func (svc *UdpSvc) handlePacket(packet *Packet) {
 	case cmd.Name_WRITE:
 		svc.handleWrite(c, unpk)
 	case cmd.Name_TAIL:
-		svc.handleTail(c, packet.RaddrPort, unpk)
+		svc.handleTail(c, packet.Raddr, unpk)
 	case cmd.Name_PING:
-		svc.handlePing(packet.RaddrPort, unpk)
+		svc.handlePing(packet.Raddr, unpk)
 	case cmd.Name_QUERY:
-		svc.handleQuery(c, packet.RaddrPort, unpk)
+		svc.handleQuery(c, packet.Raddr, unpk)
 	}
 }
 
@@ -165,7 +161,7 @@ func (svc *UdpSvc) writeToSubs() {
 				continue
 			}
 			svc.connRateLimiter.Wait(context.Background())
-			_, err := svc.conn.WriteToUDPAddrPort(protoPair.Bytes, sub.raddrPort)
+			_, err := svc.conn.WriteToUDPAddrPort(protoPair.Bytes, sub.raddr)
 			if err != nil {
 				fmt.Printf("write udp err: (%s) %s\n", raddr, err)
 			}

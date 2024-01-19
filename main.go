@@ -63,7 +63,7 @@ func main() {
 		ConnRateLimitEvery:  100 * time.Microsecond,
 		ConnRateLimitBurst:  10,
 		QueryRateLimitEvery: 10 * time.Millisecond,
-		QueryRateLimitBurst: 20,
+		QueryRateLimitBurst: 10,
 	})
 	go udpSvc.Listen(ctx)
 
@@ -73,7 +73,7 @@ func main() {
 		Buf:            buf,
 		UdpSvc:         udpSvc,
 		AlarmSvc:       alarmSvc,
-		RateLimitEvery: 100 * time.Millisecond,
+		RateLimitEvery: 250 * time.Millisecond,
 		RateLimitBurst: 10,
 	})
 	go httpSvc.ServeHttp(httpLaddrPort)

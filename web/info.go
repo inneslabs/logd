@@ -4,16 +4,11 @@ Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
 package web
 
 import (
-	"bufio"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
-	"os"
 	"runtime"
 	"sort"
-	"strconv"
-	"strings"
 	"time"
 )
 
@@ -25,9 +20,7 @@ type Info struct {
 }
 
 type MachineInfo struct {
-	NumCpu     int     `json:"numCpu"`
-	MemTotalMB float64 `json:"memTotalMB"`
-	MemAllocMB float64 `json:"memAllocMB"`
+	NumCpu int `json:"numCpu"`
 }
 
 type BufferInfo struct {
@@ -43,23 +36,12 @@ type AlarmStatus struct {
 	TimeLastTriggered int64  `json:"timeLastTriggered"`
 }
 
-var (
-	info        *Info
-	totalMemory float64
-	numCpu      int
-)
-
-func init() {
-	totalMemory, _ = readTotalMemory()
-	numCpu = runtime.NumCPU()
-}
-
 func (svc *HttpSvc) handleInfo(w http.ResponseWriter, r *http.Request) {
 	if !svc.isAuthedForReading(r) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
-	data, err := json.Marshal(info)
+	data, err := json.Marshal(svc.info)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("failed to marshal info: %s", err), http.StatusInternalServerError)
 		return
@@ -69,24 +51,22 @@ func (svc *HttpSvc) handleInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (svc *HttpSvc) measureInfo() {
+	numCpu := runtime.NumCPU()
+	bufSize := svc.buf.Size()
 	for {
-		memStats := &runtime.MemStats{}
-		runtime.ReadMemStats(memStats)
-		info = &Info{
+		svc.info = &Info{
 			Uptime: time.Since(svc.started).String(),
 			Machine: &MachineInfo{
-				NumCpu:     numCpu,
-				MemAllocMB: float64(memStats.Alloc) / 1024 / 1024,
-				MemTotalMB: totalMemory,
+				NumCpu: numCpu,
 			},
 			Buffer: &BufferInfo{
 				Writes: svc.buf.Writes.Load(),
-				Size:   svc.buf.Size(),
+				Size:   bufSize,
 			},
 			Alarms: make([]*AlarmStatus, 0),
 		}
 		for _, a := range svc.alarmSvc.Alarms {
-			info.Alarms = append(info.Alarms, &AlarmStatus{
+			svc.info.Alarms = append(svc.info.Alarms, &AlarmStatus{
 				Name:              a.Name,
 				Period:            a.Period.String(),
 				Threshold:         a.Threshold,
@@ -94,36 +74,9 @@ func (svc *HttpSvc) measureInfo() {
 				TimeLastTriggered: a.LastTriggered.UnixMilli(),
 			})
 		}
-		sort.Slice(info.Alarms, func(i, j int) bool {
-			return info.Alarms[i].Name < info.Alarms[j].Name
+		sort.Slice(svc.info.Alarms, func(i, j int) bool {
+			return svc.info.Alarms[i].Name < svc.info.Alarms[j].Name
 		})
 		time.Sleep(time.Millisecond * 500)
 	}
-}
-
-func readTotalMemory() (float64, error) {
-	file, err := os.Open("/proc/meminfo")
-	if err != nil {
-		return 0, fmt.Errorf("error opening meminfo: %w", err)
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		if strings.HasPrefix(line, "MemTotal:") {
-			fields := strings.Fields(line)
-			if len(fields) < 2 {
-				return 0, fmt.Errorf("unexpected format in meminfo")
-			}
-			memTotalKB, err := strconv.ParseUint(fields[1], 10, 64)
-			if err != nil {
-				return 0, fmt.Errorf("error parsing memory value: %w", err)
-			}
-			return float64(memTotalKB) / 1024, nil
-		}
-	}
-	if err := scanner.Err(); err != nil {
-		return 0, fmt.Errorf("error reading meminfo: %w", err)
-	}
-	return 0, errors.New("MemTotal not found in file")
 }

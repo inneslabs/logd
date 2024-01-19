@@ -12,12 +12,19 @@ primary_region = "ams"
 [deploy]
   strategy = "immediate"
 
+[runtime]
+  swap_size_mb = 2048
+
 [env]
   LOGD_UDP_LADDRPORT = "fly-global-services:6102"
   # set secrets for
   # LOGD_READ_SECRET
   # LOGD_WRITE_SECRET
   # LOGD_SLACK_WEBHOOK
+
+[mounts]
+  source = "data"
+  destination = "/data"
 
 [[services]]
   protocol = "tcp"
