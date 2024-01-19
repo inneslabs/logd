@@ -54,8 +54,8 @@ func init() {
 	numCpu = runtime.NumCPU()
 }
 
-func (s *Webserver) handleInfo(w http.ResponseWriter, r *http.Request) {
-	if !s.isAuthedForReading(r) {
+func (svc *HttpSvc) handleInfo(w http.ResponseWriter, r *http.Request) {
+	if !svc.isAuthedForReading(r) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -68,24 +68,24 @@ func (s *Webserver) handleInfo(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-func (s *Webserver) measureInfo() {
+func (svc *HttpSvc) measureInfo() {
 	for {
 		memStats := &runtime.MemStats{}
 		runtime.ReadMemStats(memStats)
 		info = &Info{
-			Uptime: time.Since(s.Started).String(),
+			Uptime: time.Since(svc.started).String(),
 			Machine: &MachineInfo{
 				NumCpu:     numCpu,
 				MemAllocMB: float64(memStats.Alloc) / 1024 / 1024,
 				MemTotalMB: totalMemory,
 			},
 			Buffer: &BufferInfo{
-				Writes: s.Buf.Writes.Load(),
-				Size:   s.Buf.Size(),
+				Writes: svc.buf.Writes.Load(),
+				Size:   svc.buf.Size(),
 			},
 			Alarms: make([]*AlarmStatus, 0),
 		}
-		for _, a := range s.AlarmSvc.Alarms {
+		for _, a := range svc.alarmSvc.Alarms {
 			info.Alarms = append(info.Alarms, &AlarmStatus{
 				Name:              a.Name,
 				Period:            a.Period.String(),

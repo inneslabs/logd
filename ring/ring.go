@@ -14,11 +14,6 @@ type RingBuffer struct {
 	Writes atomic.Uint64
 }
 
-const (
-	zero = uint32(0)
-	one  = uint64(1)
-)
-
 // NewRingBuffer returns a pointer to a new RingBuffer of given size
 func NewRingBuffer(size uint32) *RingBuffer {
 	r := &RingBuffer{
@@ -32,8 +27,10 @@ func (b *RingBuffer) Size() uint32 {
 	return b.size
 }
 
+// Write writes the data to buffer at position of head,
+// head is then atomically incremented
 func (b *RingBuffer) Write(data []byte) {
-	b.Writes.Add(one)
+	b.Writes.Add(uint64(1))
 	head := b.head.Load()
 	b.values[head] = data
 	b.head.Store((head + 1) % b.size)
@@ -41,18 +38,18 @@ func (b *RingBuffer) Write(data []byte) {
 
 // Read returns limit of data
 func (b *RingBuffer) Read(offset, limit uint32) [][]byte {
-	if limit > b.size || limit < zero {
+	if limit > b.size {
 		limit = b.size
 	}
 	output := make([][]byte, 0)
-	reads := zero
+	reads := uint32(0)
 	head := b.head.Load()
 	index := (head + (b.size - 1) + offset) % b.size
 	for reads < limit {
 		if b.values[index] != nil {
 			output = append(output, b.values[index])
 		}
-		if index == zero {
+		if index == 0 {
 			index = b.size
 		}
 		index--

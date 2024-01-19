@@ -1,7 +1,7 @@
 /*
 Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
 */
-package transport
+package udp
 
 import (
 	"context"
@@ -20,35 +20,36 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const (
-	rateLimitEvery = time.Microsecond * 100
-	rateLimitBurst = 10
-)
+type UdpSvc struct {
+	laddrPort        string
+	conn             *net.UDPConn
+	subs             map[string]*Sub
+	subsMu           sync.RWMutex
+	forSubs          chan *ProtoPair
+	connRateLimiter  *rate.Limiter
+	queryRateLimiter *rate.Limiter
+	readSecret       []byte
+	writeSecret      []byte
+	buf              *ring.RingBuffer
+	alarmSvc         *alarm.Svc
+}
+
+type Config struct {
+	LaddrPort           string
+	ReadSecret          string
+	WriteSecret         string
+	Buf                 *ring.RingBuffer
+	AlarmSvc            *alarm.Svc
+	ConnRateLimitEvery  time.Duration
+	ConnRateLimitBurst  int
+	QueryRateLimitEvery time.Duration
+	QueryRateLimitBurst int
+}
 
 type Sub struct {
 	raddrPort   netip.AddrPort
 	lastPing    time.Time
 	queryParams *cmd.QueryParams
-}
-
-type Transporter struct {
-	laddrPort   string
-	conn        *net.UDPConn
-	subs        map[string]*Sub
-	subsMu      sync.RWMutex
-	forSubs     chan *ProtoPair
-	rateLimiter *rate.Limiter
-	readSecret  []byte
-	writeSecret []byte
-	buf         *ring.RingBuffer
-	alarmSvc    *alarm.Svc
-}
-type Config struct {
-	LaddrPort   string
-	ReadSecret  string
-	WriteSecret string
-	Buf         *ring.RingBuffer
-	AlarmSvc    *alarm.Svc
 }
 
 type Packet struct {
@@ -61,81 +62,68 @@ type ProtoPair struct {
 	Bytes []byte
 }
 
-func NewTransporter(cfg *Config) *Transporter {
-	t := &Transporter{
-		laddrPort:   cfg.LaddrPort,
-		subs:        make(map[string]*Sub),
-		subsMu:      sync.RWMutex{},
-		forSubs:     make(chan *ProtoPair, 4), // small buffer helps a lot
-		rateLimiter: rate.NewLimiter(rate.Every(rateLimitEvery), rateLimitBurst),
-		readSecret:  []byte(cfg.ReadSecret),
-		writeSecret: []byte(cfg.WriteSecret),
-		buf:         cfg.Buf,
-		alarmSvc:    cfg.AlarmSvc,
+func NewSvc(cfg *Config) *UdpSvc {
+	return &UdpSvc{
+		laddrPort:        cfg.LaddrPort,
+		subs:             make(map[string]*Sub),
+		subsMu:           sync.RWMutex{},
+		forSubs:          make(chan *ProtoPair, 4), // small buffer helps a lot
+		connRateLimiter:  rate.NewLimiter(rate.Every(cfg.ConnRateLimitEvery), cfg.ConnRateLimitBurst),
+		queryRateLimiter: rate.NewLimiter(rate.Every(cfg.QueryRateLimitEvery), cfg.QueryRateLimitBurst),
+		readSecret:       []byte(cfg.ReadSecret),
+		writeSecret:      []byte(cfg.WriteSecret),
+		buf:              cfg.Buf,
+		alarmSvc:         cfg.AlarmSvc,
 	}
-
-	return t
 }
 
-func (t *Transporter) SetReadSecret(secret []byte) {
-	t.readSecret = secret
-}
-
-func (t *Transporter) SetWriteSecret(secret []byte) {
-	t.writeSecret = secret
-}
-
-func (t *Transporter) Listen(ctx context.Context) {
+func (svc *UdpSvc) Listen(ctx context.Context) {
 	// not using ResolveUDPAddrFromAddrPort because
 	// we need to resolve fly-global-services
 	// TODO: optimize this
-	l, err := net.ResolveUDPAddr("udp", t.laddrPort)
+	l, err := net.ResolveUDPAddr("udp", svc.laddrPort)
 	if err != nil {
 		panic(fmt.Errorf("resolve laddr err: %w", err))
 	}
-	t.conn, err = net.ListenUDP("udp", l)
+	svc.conn, err = net.ListenUDP("udp", l)
 	if err != nil {
 		panic(fmt.Errorf("listen udp err: %w", err))
 	}
-	defer t.conn.Close()
-	fmt.Println("listening udp on", t.conn.LocalAddr())
+	defer svc.conn.Close()
+	fmt.Println("listening udp on", svc.conn.LocalAddr())
 
 	// gophers read packets
 	packets := make(chan *Packet, 4)
-	//for i := 0; i < runtime.NumCPU(); i++ {
 	go func() {
 		fmt.Printf("packet-reading gopher started\n")
 		for {
-			t.readPacket(packets)
+			svc.readPacket(packets)
 		}
 	}()
-	//}
 
 	// gophers handle packets
-	//for i := 0; i < runtime.NumCPU(); i++ {
 	go func() {
 		fmt.Printf("packet-handling gopher started\n")
 		for {
-			t.handlePacket(<-packets)
+			svc.handlePacket(<-packets)
 		}
 	}()
-	//}
 
 	// one gopher writes to the subs
-	go t.writeToSubs()
+	go svc.writeToSubs()
 
 	// one gopher kicks subs that don't ping
-	go t.kickLateSubs()
+	go svc.kickLateSubs()
 
 	// wait for the gopher party to end
 	<-ctx.Done()
 	fmt.Println("stopped listening udp")
 }
 
-func (t *Transporter) readPacket(packets chan<- *Packet) {
+func (svc *UdpSvc) readPacket(packets chan<- *Packet) {
 	buf := make([]byte, 2048)
-	t.conn.SetReadDeadline(time.Now().Add(time.Second))
-	n, raddrPort, err := t.conn.ReadFromUDPAddrPort(buf)
+	svc.conn.SetReadDeadline(time.Now().Add(time.Second))
+	n, raddrPort, err := svc.conn.ReadFromUDPAddrPort(buf)
 	if err != nil {
 		return
 	}
@@ -145,48 +133,44 @@ func (t *Transporter) readPacket(packets chan<- *Packet) {
 	}
 }
 
-func (t *Transporter) handlePacket(packet *Packet) {
+func (svc *UdpSvc) handlePacket(packet *Packet) {
 	unpk, err := auth.UnpackSignedData(packet.Data)
 	if err != nil {
-		fmt.Println("unpack msg err:", err)
 		return
 	}
 	c := &cmd.Cmd{}
 	err = proto.Unmarshal(unpk.Payload, c)
 	if err != nil {
-		fmt.Println("protobuf unmarshal err:", err)
 		return
 	}
+	// ignore errors
 	switch c.GetName() {
 	case cmd.Name_WRITE:
-		err = t.handleWrite(c, unpk)
+		svc.handleWrite(c, unpk)
 	case cmd.Name_TAIL:
-		err = t.handleTail(c, packet.RaddrPort, unpk)
+		svc.handleTail(c, packet.RaddrPort, unpk)
 	case cmd.Name_PING:
-		err = t.handlePing(packet.RaddrPort, unpk)
+		svc.handlePing(packet.RaddrPort, unpk)
 	case cmd.Name_QUERY:
-		err = t.handleQuery(c, packet.RaddrPort, unpk)
-	}
-	if err != nil {
-		fmt.Println("handle packet err:", err)
+		svc.handleQuery(c, packet.RaddrPort, unpk)
 	}
 }
 
-func (t *Transporter) writeToSubs() {
+func (svc *UdpSvc) writeToSubs() {
 	for {
-		protoPair := <-t.forSubs
-		t.subsMu.RLock()
-		for raddr, sub := range t.subs {
+		protoPair := <-svc.forSubs
+		svc.subsMu.RLock()
+		for raddr, sub := range svc.subs {
 			if !shouldSendToSub(sub, protoPair) {
 				continue
 			}
-			t.rateLimiter.Wait(context.Background())
-			_, err := t.conn.WriteToUDPAddrPort(protoPair.Bytes, sub.raddrPort)
+			svc.connRateLimiter.Wait(context.Background())
+			_, err := svc.conn.WriteToUDPAddrPort(protoPair.Bytes, sub.raddrPort)
 			if err != nil {
 				fmt.Printf("write udp err: (%s) %s\n", raddr, err)
 			}
 		}
-		t.subsMu.RUnlock()
+		svc.subsMu.RUnlock()
 	}
 }
 
@@ -218,4 +202,13 @@ func shouldSendToSub(sub *Sub, protoPair *ProtoPair) bool {
 		}
 	}
 	return true
+}
+
+func (svc *UdpSvc) reply(txt string, raddr netip.AddrPort) {
+	payload, _ := proto.Marshal(&cmd.Msg{
+		Fn:  "logd",
+		Txt: &txt,
+	})
+	svc.connRateLimiter.Wait(context.TODO())
+	svc.conn.WriteToUDPAddrPort(payload, raddr)
 }

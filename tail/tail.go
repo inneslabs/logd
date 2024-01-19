@@ -10,7 +10,7 @@ import (
 
 	"github.com/swissinfo-ch/logd/auth"
 	"github.com/swissinfo-ch/logd/cmd"
-	"github.com/swissinfo-ch/logd/transport"
+	"github.com/swissinfo-ch/logd/udp"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -64,7 +64,7 @@ func readMsg(conn net.Conn, out chan<- *cmd.Msg) {
 
 func ping(conn net.Conn, readSecret []byte) {
 	for {
-		time.Sleep(transport.PingPeriod)
+		time.Sleep(udp.PingPeriod)
 		payload, err := proto.Marshal(&cmd.Cmd{
 			Name: cmd.Name_PING,
 		})

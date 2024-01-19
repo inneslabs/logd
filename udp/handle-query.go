@@ -1,4 +1,4 @@
-package transport
+package udp
 
 import (
 	"context"
@@ -14,28 +14,29 @@ import (
 )
 
 // handleQuery reads from the head newest first
-func (t *Transporter) handleQuery(c *cmd.Cmd, raddrPort netip.AddrPort, unpk *auth.Unpacked) error {
-	valid, err := auth.Verify(t.readSecret, unpk)
+func (svc *UdpSvc) handleQuery(c *cmd.Cmd, raddrPort netip.AddrPort, unpk *auth.Unpacked) error {
+	valid, err := auth.Verify(svc.readSecret, unpk)
 	if !valid || err != nil {
 		return errors.New("unauthorized")
 	}
-	limit := limit(c.GetQueryParams(), t.buf.Size())
+	svc.queryRateLimiter.Wait(context.TODO())
+	limit := limit(c.GetQueryParams(), svc.buf.Size())
 	tStart := tStart(c.GetQueryParams())
 	tEnd := tEnd(c.GetQueryParams())
 	env := c.GetQueryParams().GetEnv()
-	svc := c.GetQueryParams().GetSvc()
+	cmdSvc := c.GetQueryParams().GetSvc()
 	fn := c.GetQueryParams().GetFn()
 	lvl := c.GetQueryParams().GetLvl()
 	txt := c.GetQueryParams().GetTxt()
 	httpMethod := c.GetQueryParams().GetHttpMethod()
 	url := c.GetQueryParams().GetUrl()
 	responseStatus := c.GetQueryParams().GetResponseStatus()
-	max := t.buf.Size()
+	max := svc.buf.Size()
 	var offset, found uint32
-	head := t.buf.Head()
+	head := svc.buf.Head()
 	for offset < max && found < limit {
 		offset++
-		payload := t.buf.ReadOne((head - offset) % max)
+		payload := svc.buf.ReadOne((head - offset) % max)
 		if payload == nil {
 			break // reached end of items in non-full buffer
 		}
@@ -55,7 +56,7 @@ func (t *Transporter) handleQuery(c *cmd.Cmd, raddrPort netip.AddrPort, unpk *au
 		if env != "" && env != msg.GetEnv() {
 			continue
 		}
-		if svc != "" && svc != msg.GetSvc() {
+		if cmdSvc != "" && cmdSvc != msg.GetSvc() {
 			continue
 		}
 		if fn != "" && fn != msg.GetFn() {
@@ -80,11 +81,11 @@ func (t *Transporter) handleQuery(c *cmd.Cmd, raddrPort netip.AddrPort, unpk *au
 		if responseStatus != 0 && responseStatus != msgResponseStatus {
 			continue
 		}
-		err := t.rateLimiter.Wait(context.Background())
+		err := svc.connRateLimiter.Wait(context.TODO())
 		if err != nil {
 			return err
 		}
-		_, err = t.conn.WriteToUDPAddrPort(payload, raddrPort)
+		_, err = svc.conn.WriteToUDPAddrPort(payload, raddrPort)
 		if err != nil {
 			return err
 		}
@@ -99,7 +100,7 @@ func (t *Transporter) handleQuery(c *cmd.Cmd, raddrPort netip.AddrPort, unpk *au
 		Fn:  "logd",
 		Txt: &end,
 	})
-	_, err = t.conn.WriteToUDPAddrPort(endPayload, raddrPort)
+	_, err = svc.conn.WriteToUDPAddrPort(endPayload, raddrPort)
 	if err != nil {
 		fmt.Println("write to udp err:", err)
 	}

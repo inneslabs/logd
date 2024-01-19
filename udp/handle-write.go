@@ -1,7 +1,7 @@
 /*
 Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
 */
-package transport
+package udp
 
 import (
 	"errors"
@@ -12,11 +12,9 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func (t *Transporter) handleWrite(c *cmd.Cmd, unpk *auth.Unpacked) error {
-	if c.Msg == nil {
-		return errors.New("msg is nil")
-	}
-	valid, err := auth.Verify(t.writeSecret, unpk)
+func (svc *UdpSvc) handleWrite(c *cmd.Cmd, unpk *auth.Unpacked) error {
+	// verify authenticity
+	valid, err := auth.Verify(svc.writeSecret, unpk)
 	if !valid || err != nil {
 		return errors.New("unauthorised to write")
 	}
@@ -26,13 +24,13 @@ func (t *Transporter) handleWrite(c *cmd.Cmd, unpk *auth.Unpacked) error {
 		return fmt.Errorf("protobuf marshal msg err: %w", err)
 	}
 	// write to buffer
-	t.buf.Write(msgBytes)
+	svc.buf.Write(msgBytes)
 	// pipe to tails
-	t.forSubs <- &ProtoPair{
+	svc.forSubs <- &ProtoPair{
 		Msg:   c.Msg,
 		Bytes: msgBytes,
 	}
 	// pipe to alarm svc
-	t.alarmSvc.In <- c.Msg
+	svc.alarmSvc.In <- c.Msg
 	return nil
 }

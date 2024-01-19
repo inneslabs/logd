@@ -1,4 +1,4 @@
-package transport
+package udp
 
 import (
 	"fmt"
@@ -8,16 +8,16 @@ import (
 	"github.com/swissinfo-ch/logd/auth"
 )
 
-func (t *Transporter) handlePing(raddrPort netip.AddrPort, unpk *auth.Unpacked) error {
-	valid, err := auth.Verify(t.readSecret, unpk)
+func (svc *UdpSvc) handlePing(raddrPort netip.AddrPort, unpk *auth.Unpacked) error {
+	valid, err := auth.Verify(svc.readSecret, unpk)
 	if !valid || err != nil {
 		return fmt.Errorf("%s unauthorised to tail: %w", raddrPort.String(), err)
 	}
-	t.subsMu.Lock()
-	sub := t.subs[raddrPort.String()]
+	svc.subsMu.Lock()
+	sub := svc.subs[raddrPort.String()]
 	if sub != nil {
 		sub.lastPing = time.Now()
 	}
-	t.subsMu.Unlock()
+	svc.subsMu.Unlock()
 	return nil
 }

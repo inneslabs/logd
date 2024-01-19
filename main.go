@@ -14,7 +14,7 @@ import (
 
 	"github.com/swissinfo-ch/logd/alarm"
 	"github.com/swissinfo-ch/logd/ring"
-	"github.com/swissinfo-ch/logd/transport"
+	"github.com/swissinfo-ch/logd/udp"
 	"github.com/swissinfo-ch/logd/web"
 )
 
@@ -53,25 +53,30 @@ func main() {
 	// init root context
 	ctx := getCtx()
 
-	// init udp listener
-	t := transport.NewTransporter(&transport.Config{
-		LaddrPort:   udpLaddrPort,
-		ReadSecret:  readSecret,
-		WriteSecret: writeSecret,
-		Buf:         buf,
-		AlarmSvc:    alarmSvc,
+	// init udp svc
+	udpSvc := udp.NewSvc(&udp.Config{
+		LaddrPort:           udpLaddrPort,
+		ReadSecret:          readSecret,
+		WriteSecret:         writeSecret,
+		Buf:                 buf,
+		AlarmSvc:            alarmSvc,
+		ConnRateLimitEvery:  100 * time.Microsecond,
+		ConnRateLimitBurst:  10,
+		QueryRateLimitEvery: 10 * time.Millisecond,
+		QueryRateLimitBurst: 20,
 	})
-	go t.Listen(ctx)
+	go udpSvc.Listen(ctx)
 
-	// init webserver
-	h := &web.Webserver{
-		ReadSecret:  string(readSecret),
-		Buf:         buf,
-		Transporter: t,
-		AlarmSvc:    alarmSvc,
-		Started:     time.Now(),
-	}
-	go h.ServeHttp(httpLaddrPort)
+	// init http svc
+	httpSvc := web.NewHttpSvc(&web.Config{
+		ReadSecret:     readSecret,
+		Buf:            buf,
+		UdpSvc:         udpSvc,
+		AlarmSvc:       alarmSvc,
+		RateLimitEvery: 100 * time.Millisecond,
+		RateLimitBurst: 10,
+	})
+	go httpSvc.ServeHttp(httpLaddrPort)
 
 	// wait for kill signal
 	<-ctx.Done()

@@ -13,8 +13,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func (s *Webserver) handleRead(w http.ResponseWriter, r *http.Request) {
-	if !s.isAuthedForReading(r) {
+func (svc *HttpSvc) handleQuery(w http.ResponseWriter, r *http.Request) {
+	if !svc.isAuthedForReading(r) {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -46,11 +46,11 @@ func (s *Webserver) handleRead(w http.ResponseWriter, r *http.Request) {
 	fnQ := r.URL.Query().Get("fn")
 	results := make([]*cmd.Msg, 0)
 	pages := 0
-	bufSize := int(s.Buf.Size())
+	bufSize := int(svc.buf.Size())
 	offset32 := uint32(offset)
 	limit32 := uint32(limit)
 	for len(results) < int(limit) && pages*limit < bufSize/10 {
-		items := s.Buf.Read(offset32, limit32)
+		items := svc.buf.Read(offset32, limit32)
 		pages++
 		offset += limit
 		e := &cmd.Msg{}
