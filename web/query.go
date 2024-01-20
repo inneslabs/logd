@@ -44,7 +44,7 @@ func (svc *HttpSvc) handleQuery(w http.ResponseWriter, r *http.Request) {
 	envQ := r.URL.Query().Get("env")
 	svcQ := r.URL.Query().Get("svc")
 	fnQ := r.URL.Query().Get("fn")
-	results := make([]*cmd.Msg, 0)
+	results := make([]*cmd.Msg, 0, limit)
 	pages := 0
 	bufSize := int(svc.buf.Size())
 	offset32 := uint32(offset)

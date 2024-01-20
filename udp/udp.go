@@ -20,6 +20,8 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const MaxPacketSize = 2048
+
 type UdpSvc struct {
 	laddrPort        string
 	conn             *net.UDPConn
@@ -30,7 +32,8 @@ type UdpSvc struct {
 	queryRateLimiter *rate.Limiter
 	readSecret       []byte
 	writeSecret      []byte
-	buf              *ring.RingBuffer
+	ringBuf          *ring.RingBuffer
+	unpkPool         *sync.Pool
 	alarmSvc         *alarm.Svc
 }
 
@@ -38,7 +41,7 @@ type Config struct {
 	LaddrPort           string
 	ReadSecret          string
 	WriteSecret         string
-	Buf                 *ring.RingBuffer
+	RingBuf             *ring.RingBuffer
 	AlarmSvc            *alarm.Svc
 	ConnRateLimitEvery  time.Duration
 	ConnRateLimitBurst  int
@@ -72,8 +75,17 @@ func NewSvc(cfg *Config) *UdpSvc {
 		queryRateLimiter: rate.NewLimiter(rate.Every(cfg.QueryRateLimitEvery), cfg.QueryRateLimitBurst),
 		readSecret:       []byte(cfg.ReadSecret),
 		writeSecret:      []byte(cfg.WriteSecret),
-		buf:              cfg.Buf,
+		ringBuf:          cfg.RingBuf,
 		alarmSvc:         cfg.AlarmSvc,
+		unpkPool: &sync.Pool{
+			New: func() any {
+				return &auth.Unpacked{
+					Sum:       make([]byte, auth.SumLen),
+					TimeBytes: make([]byte, auth.TimeLen),
+					Payload:   make([]byte, MaxPacketSize),
+				}
+			},
+		},
 	}
 }
 
@@ -118,7 +130,7 @@ func (svc *UdpSvc) Listen(ctx context.Context) {
 }
 
 func (svc *UdpSvc) readPacket(packets chan<- *Packet) {
-	buf := make([]byte, 1024)
+	buf := make([]byte, MaxPacketSize)
 	n, raddr, err := svc.conn.ReadFromUDPAddrPort(buf)
 	if err != nil {
 		return
@@ -130,7 +142,9 @@ func (svc *UdpSvc) readPacket(packets chan<- *Packet) {
 }
 
 func (svc *UdpSvc) handlePacket(packet *Packet) {
-	unpk, err := auth.UnpackSignedData(packet.Data)
+	// get a *Unpacked from pool
+	unpk, _ := svc.unpkPool.Get().(*auth.Unpacked)
+	err := auth.UnpackSignedData(packet.Data, unpk)
 	if err != nil {
 		return
 	}
@@ -150,6 +164,8 @@ func (svc *UdpSvc) handlePacket(packet *Packet) {
 	case cmd.Name_QUERY:
 		svc.handleQuery(c, packet.Raddr, unpk)
 	}
+	// return *Unpacked to pool
+	svc.unpkPool.Put(unpk)
 }
 
 func (svc *UdpSvc) writeToSubs() {
@@ -205,6 +221,6 @@ func (svc *UdpSvc) reply(txt string, raddr netip.AddrPort) {
 		Fn:  "logd",
 		Txt: &txt,
 	})
-	svc.connRateLimiter.Wait(context.TODO())
+	svc.connRateLimiter.Wait(context.Background())
 	svc.conn.WriteToUDPAddrPort(payload, raddr)
 }

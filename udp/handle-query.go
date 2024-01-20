@@ -20,7 +20,7 @@ func (svc *UdpSvc) handleQuery(c *cmd.Cmd, raddr netip.AddrPort, unpk *auth.Unpa
 	if !valid || err != nil {
 		return errors.New("unauthorized")
 	}
-	svc.queryRateLimiter.Wait(context.TODO())
+	svc.queryRateLimiter.Wait(context.Background())
 	offset := c.GetQueryParams().GetOffset()
 	limit := limit(c.GetQueryParams().GetLimit())
 	tStart := tStart(c.GetQueryParams())
@@ -33,12 +33,12 @@ func (svc *UdpSvc) handleQuery(c *cmd.Cmd, raddr netip.AddrPort, unpk *auth.Unpa
 	httpMethod := c.GetQueryParams().GetHttpMethod()
 	url := c.GetQueryParams().GetUrl()
 	responseStatus := c.GetQueryParams().GetResponseStatus()
-	max := svc.buf.Size()
+	max := svc.ringBuf.Size()
 	var found uint32
-	head := svc.buf.Head()
+	head := svc.ringBuf.Head()
 	for offset < max && found < limit {
 		offset++
-		payload := svc.buf.ReadOne((head - offset) % max)
+		payload := svc.ringBuf.ReadOne((head - offset) % max)
 		if payload == nil {
 			break // reached end of items in non-full buffer
 		}

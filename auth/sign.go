@@ -12,10 +12,9 @@ import (
 )
 
 const (
-	hashLen = 32
 	sigTtl  = time.Millisecond * 500
-	sumLen  = 32
-	timeLen = 8
+	SumLen  = 32
+	TimeLen = 8
 )
 
 func Sign(secret, payload []byte, t time.Time) ([]byte, error) {
@@ -24,7 +23,7 @@ func Sign(secret, payload []byte, t time.Time) ([]byte, error) {
 		return nil, fmt.Errorf("convert time to bytes err: %w", err)
 	}
 	// pre-allocate slice
-	totalLen := hashLen + len(timeBytes) + len(payload)
+	totalLen := SumLen + len(timeBytes) + len(payload)
 	data := make([]byte, 0, totalLen)
 	// copy data
 	data = append(data, secret...)
@@ -32,9 +31,9 @@ func Sign(secret, payload []byte, t time.Time) ([]byte, error) {
 	data = append(data, payload...)
 	// compute checksum
 	h := sha256.Sum256(data)
-	sum := h[:hashLen]
+	sum := h[:SumLen]
 	// return sum + time + payload
-	signed := make([]byte, 0, hashLen+timeLen+len(payload))
+	signed := make([]byte, 0, SumLen+TimeLen+len(payload))
 	signed = append(signed, sum...)
 	signed = append(signed, timeBytes...)
 	return append(signed, payload...), nil
@@ -65,5 +64,5 @@ func Verify(secret []byte, unpk *Unpacked) (bool, error) {
 	// compute checksum
 	h := sha256.Sum256(data)
 	// verify equality
-	return bytes.Equal(unpk.Sum, h[:hashLen]), nil
+	return bytes.Equal(unpk.Sum, h[:SumLen]), nil
 }

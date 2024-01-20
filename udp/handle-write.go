@@ -24,7 +24,7 @@ func (svc *UdpSvc) handleWrite(c *cmd.Cmd, unpk *auth.Unpacked) error {
 		return fmt.Errorf("protobuf marshal msg err: %w", err)
 	}
 	// write to buffer
-	svc.buf.Write(msgBytes)
+	svc.ringBuf.Write(msgBytes)
 	// pipe to tails
 	svc.forSubs <- &ProtoPair{
 		Msg:   c.Msg,

@@ -63,7 +63,7 @@ func (svc *HttpSvc) measureInfo() {
 				Writes: svc.buf.Writes.Load(),
 				Size:   bufSize,
 			},
-			Alarms: make([]*AlarmStatus, 0),
+			Alarms: make([]*AlarmStatus, 0, len(svc.alarmSvc.Alarms)),
 		}
 		for _, a := range svc.alarmSvc.Alarms {
 			svc.info.Alarms = append(svc.info.Alarms, &AlarmStatus{

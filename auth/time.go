@@ -11,7 +11,7 @@ import (
 )
 
 func convertBytesToTime(b []byte) (time.Time, error) {
-	if len(b) != timeLen {
+	if len(b) != TimeLen {
 		return time.Time{}, fmt.Errorf("byte slice must be exactly 8 bytes long")
 	}
 	nano, err := bytesToInt64(b)
@@ -35,7 +35,7 @@ func int64ToBytes(num int64) ([]byte, error) {
 }
 
 func bytesToInt64(b []byte) (int64, error) {
-	if len(b) != timeLen {
+	if len(b) != TimeLen {
 		return 0, fmt.Errorf("byte slice must be exactly 8 bytes long")
 	}
 

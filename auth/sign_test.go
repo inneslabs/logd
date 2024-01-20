@@ -29,7 +29,8 @@ func TestSignAndVerify(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	unpk, err := UnpackSignedData(signed)
+	unpk := &Unpacked{}
+	err = UnpackSignedData(signed, unpk)
 	if err != nil {
 		t.FailNow()
 	}
@@ -56,7 +57,8 @@ func TestSignAndVerifyInvalid(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	unpk, err := UnpackSignedData(signed)
+	unpk := &Unpacked{}
+	err = UnpackSignedData(signed, unpk)
 	if err != nil {
 		t.FailNow()
 	}
@@ -102,7 +104,8 @@ func BenchmarkVerify(b *testing.B) {
 	if err != nil {
 		b.FailNow()
 	}
-	unpk, err := UnpackSignedData(signed)
+	unpk := &Unpacked{}
+	err = UnpackSignedData(signed, unpk)
 	if err != nil {
 		b.FailNow()
 	}

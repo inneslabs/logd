@@ -10,6 +10,7 @@ import (
 
 	"github.com/swissinfo-ch/logd/auth"
 	"github.com/swissinfo-ch/logd/cmd"
+	"github.com/swissinfo-ch/logd/udp"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -43,7 +44,7 @@ func writeRequest(q *cmd.QueryParams, conn net.Conn, readSecret []byte) error {
 }
 
 func readMsgs(conn net.Conn, out chan<- *cmd.Msg) {
-	buf := make([]byte, 2048)
+	buf := make([]byte, udp.MaxPacketSize)
 	for {
 		m, err := readMsg(buf, conn)
 		if err != nil {
@@ -55,7 +56,7 @@ func readMsgs(conn net.Conn, out chan<- *cmd.Msg) {
 }
 
 func readMsg(buf []byte, conn net.Conn) (*cmd.Msg, error) {
-	buf = buf[:2048] // re-slice to max capacity
+	buf = buf[:udp.MaxPacketSize] // re-slice to capacity
 	n, err := conn.Read(buf)
 	if err != nil {
 		return nil, err

@@ -11,13 +11,12 @@ type Unpacked struct {
 	Payload []byte
 }
 
-func UnpackSignedData(data []byte) (*Unpacked, error) {
-	if len(data) < sumLen+timeLen {
-		return nil, errors.New("data too short")
+func UnpackSignedData(data []byte, unpk *Unpacked) error {
+	if len(data) < SumLen+TimeLen {
+		return errors.New("data too short")
 	}
-	return &Unpacked{
-		Sum:       data[:sumLen],
-		TimeBytes: data[sumLen : sumLen+timeLen],
-		Payload:   data[sumLen+timeLen:],
-	}, nil
+	unpk.Sum = data[:SumLen]
+	unpk.TimeBytes = data[SumLen : SumLen+TimeLen]
+	unpk.Payload = data[SumLen+TimeLen:]
+	return nil
 }

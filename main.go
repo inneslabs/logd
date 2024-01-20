@@ -20,13 +20,13 @@ import (
 
 func main() {
 	var (
-		buf           *ring.RingBuffer
 		bufferSizeStr = os.Getenv("LOGD_BUFFER_SIZE")
 		httpLaddrPort = os.Getenv("LOGD_HTTP_LADDRPORT")
 		udpLaddrPort  = os.Getenv("LOGD_UDP_LADDRPORT")
 		readSecret    = os.Getenv("LOGD_READ_SECRET")
 		writeSecret   = os.Getenv("LOGD_WRITE_SECRET")
 		slackWebhook  = os.Getenv("LOGD_SLACK_WEBHOOK")
+		ringBuf       *ring.RingBuffer
 	)
 
 	// defaults
@@ -42,7 +42,7 @@ func main() {
 	if err != nil {
 		bufferSize = 1000000
 	}
-	buf = ring.NewRingBuffer(uint32(bufferSize))
+	ringBuf = ring.NewRingBuffer(uint32(bufferSize))
 	fmt.Printf("created ring buffer with %d slots\n", bufferSize)
 
 	// init alarm svc
@@ -58,7 +58,7 @@ func main() {
 		LaddrPort:           udpLaddrPort,
 		ReadSecret:          readSecret,
 		WriteSecret:         writeSecret,
-		Buf:                 buf,
+		RingBuf:             ringBuf,
 		AlarmSvc:            alarmSvc,
 		ConnRateLimitEvery:  100 * time.Microsecond,
 		ConnRateLimitBurst:  10,
@@ -70,7 +70,7 @@ func main() {
 	// init http svc
 	httpSvc := web.NewHttpSvc(&web.Config{
 		ReadSecret:     readSecret,
-		Buf:            buf,
+		Buf:            ringBuf,
 		UdpSvc:         udpSvc,
 		AlarmSvc:       alarmSvc,
 		RateLimitEvery: 250 * time.Millisecond,
