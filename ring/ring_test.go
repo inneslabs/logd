@@ -6,6 +6,7 @@ package ring
 import (
 	"bytes"
 	"crypto/rand"
+	"fmt"
 	"testing"
 )
 
@@ -78,4 +79,29 @@ func testWriteAndRead(size, nWrites int) bool {
 		}
 	}
 	return equal
+}
+
+// BenchmarkWriteRingBuffer tests the performance of writing to the RingBuffer
+func BenchmarkWriteRingBuffer(b *testing.B) {
+	buffer := NewRingBuffer(1024) // Adjust size as needed
+	data := []byte("sample data") // Sample data to write
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		buffer.Write(data)
+	}
+}
+
+// BenchmarkReadRingBuffer tests the performance of reading from the RingBuffer
+func BenchmarkReadRingBuffer(b *testing.B) {
+	size := uint32(4096)
+	buf := NewRingBuffer(size)
+	for i := uint32(0); i < size; i++ {
+		data := []byte(fmt.Sprintf("sample data %d", i))
+		buf.Write(data)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		buf.Read(uint32(i)%size, 512)
+	}
 }
