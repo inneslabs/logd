@@ -23,9 +23,14 @@ func Sign(secret, payload []byte, t time.Time) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("convert time to bytes err: %w", err)
 	}
-	// concat secret, timeBytes & payload
-	data := append(secret, timeBytes...)
+	// pre-allocate slice
+	totalLen := hashLen + len(timeBytes) + len(payload)
+	data := make([]byte, 0, totalLen)
+	// copy data
+	data = append(data, secret...)
+	data = append(data, timeBytes...)
 	data = append(data, payload...)
+	// compute checksum
 	h := sha256.Sum256(data)
 	sum := h[:hashLen]
 	// return sum + time + payload
@@ -36,20 +41,29 @@ func Sign(secret, payload []byte, t time.Time) ([]byte, error) {
 }
 
 func Verify(secret []byte, unpk *Unpacked) (bool, error) {
+	// if secret is unset, return true immediately
 	if len(secret) == 0 {
 		return true, nil
 	}
+	// convert time
 	t, err := convertBytesToTime(unpk.TimeBytes)
 	if err != nil {
 		return false, fmt.Errorf("convert bytes to time err: %w", err)
 	}
+	// verify timestamp is within threshold
 	if t.After(time.Now().Add(sigTtl)) ||
 		t.Before(time.Now().Add(-sigTtl)) {
 		return false, errors.New("time is outside of threshold")
 	}
-	data := append(secret, unpk.TimeBytes...)
+	// pre-allocate slice
+	totalLen := len(secret) + len(unpk.TimeBytes) + len(unpk.Payload)
+	data := make([]byte, 0, totalLen)
+	// copy data
+	data = append(data, secret...)
+	data = append(data, unpk.TimeBytes...)
 	data = append(data, unpk.Payload...)
+	// compute checksum
 	h := sha256.Sum256(data)
-	mySum := h[:hashLen]
-	return bytes.Equal(unpk.Sum, mySum), nil
+	// verify equality
+	return bytes.Equal(unpk.Sum, h[:hashLen]), nil
 }
