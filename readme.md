@@ -1,6 +1,6 @@
 # Logd
 ![A circular buffer](.doc/circular_buffer.svg)
-## Logs for your apps in constant time and constant space with ultra-low latency.
+## Logs for your apps in constant time and constant space.
 Logd (pronounced "logged") is a circular buffer for writing & reading up to 1 million logs per minute.
 
 Logd will never run out of memory if the buffer size is ok for the given machine spec. Reads & writes are constant-time.
