@@ -1,5 +1,9 @@
 # Logd
 ![A circular buffer](.doc/circular_buffer.svg)
+
+## At first
+Read the **onboarding** readme on GITHUB
+
 ## Logs for your apps in constant time and constant space.
 Logd (pronounced "logged") is a circular buffer for writing & reading millions of logs per minute.
 
