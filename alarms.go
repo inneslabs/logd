@@ -28,7 +28,7 @@ func prodWpErrors(slackWebhook string) *alarm.Alarm {
 		Period:    time.Minute * 10,
 		Threshold: 10,
 		Action: func() error {
-			return alarm.SendSlackMsg("💥 We've had 10 errors on prod/wp in the last 10 minutes.", slackWebhook)
+			return alarm.SendSlackMsg("We've had 10 errors on prod/wp in the last 10 minutes.", slackWebhook)
 		},
 	}
 }
@@ -48,7 +48,7 @@ func prodErrors(slackWebhook string) *alarm.Alarm {
 		Period:    time.Minute * 10,
 		Threshold: 50,
 		Action: func() error {
-			return alarm.SendSlackMsg("💣 We've had 50 errors on prod in the last 10 minutes.", slackWebhook)
+			return alarm.SendSlackMsg("We've had 50 errors on prod in the last 10 minutes.", slackWebhook)
 		},
 	}
 }
