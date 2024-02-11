@@ -22,14 +22,32 @@ if [ -z "$IPV4" ]; then
     exit 1
 fi
 
+# Extract the IPv6 address
+# NOTE: Currently UDP is ONLY supported for IPv4 addresses on Fly
+# This is just for HTTP traffic
+IPV6=$(echo "$IPS_LIST" | awk '/v6/{print $2}')
+if [ -z "$IPV6" ]; then
+    echo "No IPv6 address found."
+    exit 1
+fi
+
 echo "Updating DNS records for $RECORD_NAME with IPv4: $IPV4"
 
-# Update Route53 DNS record
+# Update Route53 A record
 aws route53 change-resource-record-sets \
       --hosted-zone-id "$AWS_HOSTED_ZONE_ID" \
       --change-batch "{\"Changes\":[{\"Action\":\"UPSERT\",\"ResourceRecordSet\":{\"Name\":\"$RECORD_NAME\",\"Type\":\"A\",\"TTL\":60,\"ResourceRecords\":[{\"Value\":\"$IPV4\"}]}}]}"
 if [ $? -ne 0 ]; then
-    echo "Failed to update DNS records."
+    echo "Failed to update A record."
+    exit 1
+fi
+
+# Update Route53 AAAA record
+aws route53 change-resource-record-sets \
+      --hosted-zone-id "$AWS_HOSTED_ZONE_ID" \
+      --change-batch "{\"Changes\":[{\"Action\":\"UPSERT\",\"ResourceRecordSet\":{\"Name\":\"$RECORD_NAME\",\"Type\":\"AAAA\",\"TTL\":60,\"ResourceRecords\":[{\"Value\":\"$IPV6\"}]}}]}"
+if [ $? -ne 0 ]; then
+    echo "Failed to update AAAA record."
     exit 1
 fi
 
