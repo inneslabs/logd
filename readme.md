@@ -19,6 +19,9 @@ There is currently no cache of UDP packet hashes, so we can't yet detect/prevent
 
 Estimated time start-to-prod: 2-3 hours.
 
+## Deploy to logd.swissinfo.ch
+Use app Zoe's Deploy GitHub action as a base.
+
 # Auth
 Logd authenticates clients for either reading or writing using 2 shared secrets.
 These are stored encrypted in our secrets SOPS file.
