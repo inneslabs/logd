@@ -19,6 +19,7 @@ func TailMsg(q *cmd.QueryParams, conn net.Conn, readSecret []byte) (<-chan *cmd.
 	if err != nil {
 		return nil, fmt.Errorf("send tail cmd err: %w", err)
 	}
+	fmt.Printf("\rsent tail cmd\033[0K")
 	out := make(chan *cmd.Msg)
 	go readMsg(conn, out)
 	go ping(conn, readSecret)
