@@ -15,6 +15,7 @@ type slackMsg struct {
 }
 
 func SendSlackMsg(msg, slackWebhook string) error {
+	fmt.Println("sending slack message to ", slackWebhook, msg)
 	buf := &bytes.Buffer{}
 	enc := json.NewEncoder(buf)
 	err := enc.Encode(&slackMsg{msg})
@@ -22,8 +23,11 @@ func SendSlackMsg(msg, slackWebhook string) error {
 		return fmt.Errorf("marshal json err: %w", err)
 	}
 	resp, err := http.Post(slackWebhook, "application/json", buf)
-	if err != nil || resp.StatusCode != 200 {
-		return fmt.Errorf("failed to send slack message: %d %s %w", resp.StatusCode, resp.Status, err)
+	if err != nil {
+		return fmt.Errorf("failed to send slack message: %w", err)
+	}
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to send slack message: %d %s", resp.StatusCode, resp.Status)
 	}
 	return nil
 }
