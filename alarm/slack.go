@@ -10,16 +10,14 @@ import (
 	"net/http"
 )
 
-type SlackMsg struct {
+type slackMsg struct {
 	Text string `json:"text"`
 }
 
 func SendSlackMsg(msg, slackWebhook string) error {
 	buf := &bytes.Buffer{}
 	enc := json.NewEncoder(buf)
-	err := enc.Encode(&SlackMsg{
-		Text: msg,
-	})
+	err := enc.Encode(&slackMsg{msg})
 	if err != nil {
 		return fmt.Errorf("marshal json err: %w", err)
 	}
