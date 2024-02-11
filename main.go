@@ -60,8 +60,8 @@ func main() {
 		WriteSecret:         writeSecret,
 		RingBuf:             ringBuf,
 		AlarmSvc:            alarmSvc,
-		ConnRateLimitEvery:  100 * time.Microsecond,
-		ConnRateLimitBurst:  10,
+		SubRateLimitEvery:   100 * time.Microsecond,
+		SubRateLimitBurst:   10,
 		QueryRateLimitEvery: 10 * time.Millisecond,
 		QueryRateLimitBurst: 10,
 	})

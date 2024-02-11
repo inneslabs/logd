@@ -28,7 +28,7 @@ type UdpSvc struct {
 	subs             map[string]*Sub
 	subsMu           sync.RWMutex
 	forSubs          chan *ProtoPair
-	connRateLimiter  *rate.Limiter
+	subRateLimiter   *rate.Limiter
 	queryRateLimiter *rate.Limiter
 	readSecret       []byte
 	writeSecret      []byte
@@ -43,8 +43,8 @@ type Config struct {
 	WriteSecret         string
 	RingBuf             *ring.RingBuffer
 	AlarmSvc            *alarm.Svc
-	ConnRateLimitEvery  time.Duration
-	ConnRateLimitBurst  int
+	SubRateLimitEvery   time.Duration
+	SubRateLimitBurst   int
 	QueryRateLimitEvery time.Duration
 	QueryRateLimitBurst int
 }
@@ -71,7 +71,7 @@ func NewSvc(cfg *Config) *UdpSvc {
 		subs:             make(map[string]*Sub),
 		subsMu:           sync.RWMutex{},
 		forSubs:          make(chan *ProtoPair, 4), // small buffer helps a lot
-		connRateLimiter:  rate.NewLimiter(rate.Every(cfg.ConnRateLimitEvery), cfg.ConnRateLimitBurst),
+		subRateLimiter:   rate.NewLimiter(rate.Every(cfg.SubRateLimitEvery), cfg.SubRateLimitBurst),
 		queryRateLimiter: rate.NewLimiter(rate.Every(cfg.QueryRateLimitEvery), cfg.QueryRateLimitBurst),
 		readSecret:       []byte(cfg.ReadSecret),
 		writeSecret:      []byte(cfg.WriteSecret),
@@ -176,7 +176,7 @@ func (svc *UdpSvc) writeToSubs() {
 			if !shouldSendToSub(sub, protoPair) {
 				continue
 			}
-			svc.connRateLimiter.Wait(context.Background())
+			svc.subRateLimiter.Wait(context.Background())
 			_, err := svc.conn.WriteToUDPAddrPort(protoPair.Bytes, sub.raddr)
 			if err != nil {
 				fmt.Printf("write udp err: (%s) %s\n", raddr, err)
@@ -221,6 +221,6 @@ func (svc *UdpSvc) reply(txt string, raddr netip.AddrPort) {
 		Fn:  "logd",
 		Txt: &txt,
 	})
-	svc.connRateLimiter.Wait(context.Background())
+	svc.subRateLimiter.Wait(context.Background())
 	svc.conn.WriteToUDPAddrPort(payload, raddr)
 }

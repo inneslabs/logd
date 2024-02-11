@@ -83,7 +83,7 @@ func (svc *UdpSvc) handleQuery(c *cmd.Cmd, raddr netip.AddrPort, unpk *auth.Unpa
 		if responseStatus != 0 && responseStatus != msgResponseStatus {
 			continue
 		}
-		err := svc.connRateLimiter.Wait(context.TODO())
+		err := svc.subRateLimiter.Wait(context.TODO())
 		if err != nil {
 			return err
 		}
