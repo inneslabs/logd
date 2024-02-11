@@ -6,14 +6,9 @@
 #
 
 IPS_LIST=$(flyctl ips list)
-IPV6=$(echo "$IPS_LIST" | awk '/v6/{print $2}')
 IPV4=$(echo "$IPS_LIST" | awk '/v4/{print $2}')
 
-echo "Updating DNS records for $RECORD_NAME with IPv4: $IPV4 and IPv6: $IPV6"
-
-aws route53 change-resource-record-sets \
-      --hosted-zone-id $AWS_HOSTED_ZONE_ID \
-      --change-batch "{\"Changes\":[{\"Action\":\"UPSERT\",\"ResourceRecordSet\":{\"Name\":\"$RECORD_NAME\",\"Type\":\"AAAA\",\"TTL\":60,\"ResourceRecords\":[{\"Value\":\"$IPV6\"}]}}]}"
+echo "Updating DNS records for $RECORD_NAME with IPv4: $IPV4
 
 aws route53 change-resource-record-sets \
       --hosted-zone-id $AWS_HOSTED_ZONE_ID \
