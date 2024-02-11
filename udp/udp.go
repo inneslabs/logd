@@ -67,10 +67,11 @@ type ProtoPair struct {
 
 func NewSvc(cfg *Config) *UdpSvc {
 	return &UdpSvc{
-		laddrPort:        cfg.LaddrPort,
-		subs:             make(map[string]*Sub),
-		subsMu:           sync.RWMutex{},
-		forSubs:          make(chan *ProtoPair, 4), // small buffer helps a lot
+		laddrPort: cfg.LaddrPort,
+		subs:      make(map[string]*Sub),
+		subsMu:    sync.RWMutex{},
+		// increased buffer size from 4 (2024-02-11)
+		forSubs:          make(chan *ProtoPair, 10000),
 		subRateLimiter:   rate.NewLimiter(rate.Every(cfg.SubRateLimitEvery), cfg.SubRateLimitBurst),
 		queryRateLimiter: rate.NewLimiter(rate.Every(cfg.QueryRateLimitEvery), cfg.QueryRateLimitBurst),
 		readSecret:       []byte(cfg.ReadSecret),
@@ -102,7 +103,7 @@ func (svc *UdpSvc) Listen(ctx context.Context) {
 	fmt.Println("listening udp on", svc.conn.LocalAddr())
 
 	// one gopher reads packets
-	packets := make(chan *Packet, 4)
+	packets := make(chan *Packet, 100)
 	go func() {
 		fmt.Printf("packet-reading gopher started\n")
 		for {

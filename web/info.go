@@ -13,6 +13,7 @@ import (
 )
 
 type Info struct {
+	Commit  string         `json:"commit"`
 	Uptime  string         `json:"uptime"`
 	Machine *MachineInfo   `json:"machine"`
 	Buffer  *BufferInfo    `json:"buffer"`
@@ -70,6 +71,7 @@ func (svc *HttpSvc) measureInfo() {
 		lastTime = time.Now()
 
 		svc.info = &Info{
+			Commit: svc.commit,
 			Uptime: time.Since(svc.started).String(),
 			Machine: &MachineInfo{
 				NumCpu: numCpu,

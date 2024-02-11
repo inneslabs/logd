@@ -24,6 +24,7 @@ type HttpSvc struct {
 	started     time.Time
 	rateLimiter *rate.Limiter
 	info        *Info
+	commit      string
 }
 
 type Config struct {
@@ -36,6 +37,11 @@ type Config struct {
 }
 
 func NewHttpSvc(cfg *Config) *HttpSvc {
+	// read commit file
+	commit, err := os.ReadFile("commit")
+	if err != nil {
+		panic(fmt.Sprintf("failed to read commit file: %s", err))
+	}
 	return &HttpSvc{
 		readSecret:  cfg.ReadSecret,
 		buf:         cfg.Buf,
@@ -43,6 +49,7 @@ func NewHttpSvc(cfg *Config) *HttpSvc {
 		alarmSvc:    cfg.AlarmSvc,
 		started:     time.Now(),
 		rateLimiter: rate.NewLimiter(rate.Every(cfg.RateLimitEvery), cfg.RateLimitBurst),
+		commit:      string(commit),
 	}
 }
 
