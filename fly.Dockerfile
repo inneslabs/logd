@@ -27,6 +27,8 @@ FROM scratch
 
 # Copy zoneinfo for time zone support
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+# Copy ca-certs for SSL support
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 # Copy binary and app files
 COPY --from=builder /app/logd /logd
 COPY --from=builder /app/commit /commit
