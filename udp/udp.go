@@ -71,7 +71,7 @@ func NewSvc(cfg *Config) *UdpSvc {
 		subs:      make(map[string]*Sub),
 		subsMu:    sync.RWMutex{},
 		// increased buffer size from 4 (2024-02-11)
-		forSubs:          make(chan *ProtoPair, 10000),
+		forSubs:          make(chan *ProtoPair, 100),
 		subRateLimiter:   rate.NewLimiter(rate.Every(cfg.SubRateLimitEvery), cfg.SubRateLimitBurst),
 		queryRateLimiter: rate.NewLimiter(rate.Every(cfg.QueryRateLimitEvery), cfg.QueryRateLimitBurst),
 		readSecret:       []byte(cfg.ReadSecret),
