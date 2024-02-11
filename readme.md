@@ -12,6 +12,7 @@ As the buffer becomes full, each write overwrites the oldest element.
 - [RingBuffer](.doc/ring-feedback.md)
 - [UdpSvc](.doc/udp-feedback.md)
 - [Monitoring](.doc/info-feedback.md)
+- [Alarms](.doc/alarm-feedback.md)
 
 # To Do
 ## Fix Replay Vulnerability
