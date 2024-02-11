@@ -4,6 +4,7 @@ Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
 package main
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/swissinfo-ch/logd/alarm"
@@ -34,7 +35,7 @@ func prodWpErrors(slackWebhook string) *alarm.Alarm {
 }
 
 func prodErrors(slackWebhook string) *alarm.Alarm {
-	return &alarm.Alarm{
+	a := &alarm.Alarm{
 		Name: "prod/error",
 		Match: func(m *cmd.Msg) bool {
 			if m.GetLvl() != cmd.Lvl_ERROR {
@@ -46,9 +47,13 @@ func prodErrors(slackWebhook string) *alarm.Alarm {
 			return true
 		},
 		Period:    time.Minute * 10,
-		Threshold: 50,
-		Action: func() error {
-			return alarm.SendSlackMsg("We've had 50 errors on prod in the last 10 minutes.", slackWebhook)
-		},
+		Threshold: 5,
 	}
+	a.Action = func() error {
+		return alarm.SendSlackMsg(
+			fmt.Sprintf("We've had %d errors on prod in the last %s.",
+				a.Threshold, a.Period.String()),
+			slackWebhook)
+	}
+	return a
 }
