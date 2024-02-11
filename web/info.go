@@ -24,8 +24,9 @@ type MachineInfo struct {
 }
 
 type BufferInfo struct {
-	Writes uint64 `json:"writes"`
-	Size   uint32 `json:"size"`
+	Writes         uint64 `json:"writes"`
+	Size           uint32 `json:"size"`
+	MaxWritePerSec uint64 `json:"maxWritePerSec"`
 }
 
 type AlarmStatus struct {
@@ -53,18 +54,34 @@ func (svc *HttpSvc) handleInfo(w http.ResponseWriter, r *http.Request) {
 func (svc *HttpSvc) measureInfo() {
 	numCpu := runtime.NumCPU()
 	bufSize := svc.buf.Size()
+	lastWrites := uint64(0)
+	lastTime := time.Now()
+	maxWritePerSec := uint64(0)
+
 	for {
+		currentWrites := svc.buf.Writes.Load()
+		delta := currentWrites - lastWrites
+		timeDelta := time.Since(lastTime).Seconds()
+		writePerSec := uint64(float64(delta) / timeDelta)
+		if writePerSec > maxWritePerSec {
+			maxWritePerSec = writePerSec
+		}
+		lastWrites = currentWrites
+		lastTime = time.Now()
+
 		svc.info = &Info{
 			Uptime: time.Since(svc.started).String(),
 			Machine: &MachineInfo{
 				NumCpu: numCpu,
 			},
 			Buffer: &BufferInfo{
-				Writes: svc.buf.Writes.Load(),
-				Size:   bufSize,
+				Writes:         currentWrites,
+				Size:           bufSize,
+				MaxWritePerSec: maxWritePerSec,
 			},
 			Alarms: make([]*AlarmStatus, 0, len(svc.alarmSvc.Alarms)),
 		}
+
 		for _, a := range svc.alarmSvc.Alarms {
 			svc.info.Alarms = append(svc.info.Alarms, &AlarmStatus{
 				Name:              a.Name,
@@ -74,9 +91,11 @@ func (svc *HttpSvc) measureInfo() {
 				TimeLastTriggered: a.LastTriggered.UnixMilli(),
 			})
 		}
+
 		sort.Slice(svc.info.Alarms, func(i, j int) bool {
 			return svc.info.Alarms[i].Name < svc.info.Alarms[j].Name
 		})
+
 		time.Sleep(time.Millisecond * 500)
 	}
 }

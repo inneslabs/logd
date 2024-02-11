@@ -1,4 +1,4 @@
-# GPT-4 Feedback of Ring Buffer
+# GPT-4 Feedback of ring/ring.go
 ```
 commit b2c2f4142a4110394309f9722e6dd9abbf9d2160
 ```
