@@ -51,7 +51,7 @@ func readMsg(conn net.Conn, out chan<- *cmd.Msg) {
 		buf = buf[:udp.MaxPacketSize] // re-slice to capacity
 		n, err := conn.Read(buf)
 		if err != nil {
-			fmt.Printf("error reading from conn: %s\n", err)
+			fmt.Printf("\rerror reading from conn: %s\n", err)
 		}
 		m := &cmd.Msg{}
 		err = proto.Unmarshal(buf[:n], m)

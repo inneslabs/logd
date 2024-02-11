@@ -22,7 +22,7 @@ func (svc *UdpSvc) handleTail(c *cmd.Cmd, raddr netip.AddrPort, unpk *auth.Unpac
 		queryParams: c.GetQueryParams(),
 	}
 	svc.subsMu.Unlock()
-	svc.reply("tailing logs", raddr)
+	svc.reply("\rtailing logs\033[0K", raddr)
 	fmt.Println("got new tail", raddr.String())
 	return nil
 }
