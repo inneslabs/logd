@@ -16,13 +16,18 @@ const (
 
 func (svc *UdpSvc) kickLateSubs() {
 	for {
-		for raddr, sub := range svc.subs {
-			if sub.lastPing.Before(time.Now().Add(-(PingPeriod * kickAfterMissingPings))) {
-				svc.kickSub(svc.conn, sub, raddr)
-				return
+		select {
+		case <-time.After(PingPeriod):
+			for raddr, sub := range svc.subs {
+				if sub.lastPing.Before(time.Now().Add(-(PingPeriod * kickAfterMissingPings))) {
+					svc.kickSub(svc.conn, sub, raddr)
+					return
+				}
 			}
+		case <-svc.ctx.Done():
+			fmt.Println("kickLateSubs ended")
+			return
 		}
-		time.Sleep(PingPeriod)
 	}
 }
 

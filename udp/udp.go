@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -23,7 +24,8 @@ import (
 const MaxPacketSize = 1920
 
 type UdpSvc struct {
-	laddrPort        string
+	ctx              context.Context
+	laddrPort        int
 	conn             *net.UDPConn
 	subs             map[string]*Sub
 	subsMu           sync.RWMutex
@@ -37,8 +39,9 @@ type UdpSvc struct {
 	alarmSvc         *alarm.Svc
 }
 
-type Config struct {
-	LaddrPort           string
+type Cfg struct {
+	Ctx                 context.Context
+	LaddrPort           int
 	ReadSecret          string
 	WriteSecret         string
 	RingBuf             *ring.RingBuffer
@@ -65,8 +68,9 @@ type ProtoPair struct {
 	Bytes []byte
 }
 
-func NewSvc(cfg *Config) *UdpSvc {
-	return &UdpSvc{
+func NewSvc(cfg *Cfg) *UdpSvc {
+	svc := &UdpSvc{
+		ctx:       cfg.Ctx,
 		laddrPort: cfg.LaddrPort,
 		subs:      make(map[string]*Sub),
 		subsMu:    sync.RWMutex{},
@@ -88,10 +92,16 @@ func NewSvc(cfg *Config) *UdpSvc {
 			},
 		},
 	}
+	go svc.listen()
+	// one gopher kicks subs that don't ping
+	go svc.kickLateSubs()
+	// one gopher writes to the subs
+	go svc.writeToSubs()
+	return svc
 }
 
-func (svc *UdpSvc) Listen(ctx context.Context) {
-	l, err := net.ResolveUDPAddr("udp", svc.laddrPort)
+func (svc *UdpSvc) listen() {
+	l, err := net.ResolveUDPAddr("udp", ":"+strconv.Itoa(svc.laddrPort))
 	if err != nil {
 		panic(fmt.Errorf("resolve laddr err: %w", err))
 	}
@@ -119,14 +129,8 @@ func (svc *UdpSvc) Listen(ctx context.Context) {
 		}
 	}()
 
-	// one gopher writes to the subs
-	go svc.writeToSubs()
-
-	// one gopher kicks subs that don't ping
-	go svc.kickLateSubs()
-
 	// wait for the gopher party to end
-	<-ctx.Done()
+	<-svc.ctx.Done()
 	fmt.Println("stopped listening udp")
 }
 
@@ -171,19 +175,24 @@ func (svc *UdpSvc) handlePacket(packet *Packet) {
 
 func (svc *UdpSvc) writeToSubs() {
 	for {
-		protoPair := <-svc.forSubs
-		svc.subsMu.RLock()
-		for raddr, sub := range svc.subs {
-			if !shouldSendToSub(sub, protoPair) {
-				continue
+		select {
+		case protoPair := <-svc.forSubs:
+			svc.subsMu.RLock()
+			for raddr, sub := range svc.subs {
+				if !shouldSendToSub(sub, protoPair) {
+					continue
+				}
+				svc.subRateLimiter.Wait(context.Background())
+				_, err := svc.conn.WriteToUDPAddrPort(protoPair.Bytes, sub.raddr)
+				if err != nil {
+					fmt.Printf("write udp err: (%s) %s\n", raddr, err)
+				}
 			}
-			svc.subRateLimiter.Wait(context.Background())
-			_, err := svc.conn.WriteToUDPAddrPort(protoPair.Bytes, sub.raddr)
-			if err != nil {
-				fmt.Printf("write udp err: (%s) %s\n", raddr, err)
-			}
+			svc.subsMu.RUnlock()
+		case <-svc.ctx.Done():
+			fmt.Println("writeToSubs ended")
+			return
 		}
-		svc.subsMu.RUnlock()
 	}
 }
 

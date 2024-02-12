@@ -13,39 +13,54 @@ import (
 	"time"
 
 	"github.com/swissinfo-ch/logd/alarm"
+	"github.com/swissinfo-ch/logd/app"
 	"github.com/swissinfo-ch/logd/ring"
 	"github.com/swissinfo-ch/logd/udp"
-	"github.com/swissinfo-ch/logd/web"
 )
 
 func main() {
-	var (
-		bufferSizeStr = os.Getenv("LOGD_BUFFER_SIZE")
-		httpLaddrPort = os.Getenv("LOGD_HTTP_LADDRPORT")
-		udpLaddrPort  = os.Getenv("LOGD_UDP_LADDRPORT")
-		readSecret    = os.Getenv("LOGD_READ_SECRET")
-		writeSecret   = os.Getenv("LOGD_WRITE_SECRET")
-		slackWebhook  = os.Getenv("LOGD_SLACK_WEBHOOK")
-		ringBuf       *ring.RingBuffer
-	)
+	// no default, can also be blank
+	readSecret := os.Getenv("LOGD_READ_SECRET")
+	writeSecret := os.Getenv("LOGD_WRITE_SECRET")
+	slackWebhook := os.Getenv("LOGD_SLACK_WEBHOOK")
 
 	// defaults
-	if httpLaddrPort == "" {
-		httpLaddrPort = ":6101"
+	appPort := 6101
+	udpPort := 6102
+	bufferSize := 1000000
+
+	appPortEnv, set := os.LookupEnv("LOGD_APP_PORT")
+	if set {
+		var err error
+		appPort, err = strconv.Atoi(appPortEnv)
+		if err != nil {
+			panic("LOGD_APP_PORT must be an int")
+		}
 	}
-	if udpLaddrPort == "" {
-		udpLaddrPort = ":6102"
+
+	udpPortEnv, set := os.LookupEnv("LOGD_UDP_PORT")
+	if set {
+		var err error
+		udpPort, err = strconv.Atoi(udpPortEnv)
+		if err != nil {
+			panic("LOGD_UDP_PORT must be an int")
+		}
+	}
+
+	bufferSizeEnv, set := os.LookupEnv("LOGD_BUFFER_SIZE")
+	if set {
+		var err error
+		bufferSize, err = strconv.Atoi(bufferSizeEnv)
+		if err != nil {
+			panic("LOGD_BUFFER_SIZE must be an int")
+		}
 	}
 
 	// init ring buffer
-	bufferSize, err := strconv.ParseUint(bufferSizeStr, 10, 32)
-	if err != nil {
-		bufferSize = 1000000
-	}
-	ringBuf = ring.NewRingBuffer(uint32(bufferSize))
-	fmt.Printf("created ring buffer with %d slots\n", bufferSize)
+	ringBuf := ring.NewRingBuffer(uint32(bufferSize))
+	fmt.Printf("created ring buffer with capacity %d\n", bufferSize)
 
-	// init alarm svc
+	// init alarms
 	alarmSvc := alarm.NewSvc()
 	alarmSvc.Set(prodWpErrors(slackWebhook))
 	alarmSvc.Set(prodErrors(slackWebhook))
@@ -53,9 +68,10 @@ func main() {
 	// init root context
 	ctx := getCtx()
 
-	// init udp svc
-	udpSvc := udp.NewSvc(&udp.Config{
-		LaddrPort:           udpLaddrPort,
+	// init udp
+	udp.NewSvc(&udp.Cfg{
+		Ctx:                 ctx,
+		LaddrPort:           udpPort,
 		ReadSecret:          readSecret,
 		WriteSecret:         writeSecret,
 		RingBuf:             ringBuf,
@@ -65,18 +81,16 @@ func main() {
 		QueryRateLimitEvery: 20 * time.Millisecond,
 		QueryRateLimitBurst: 10,
 	})
-	go udpSvc.Listen(ctx)
 
-	// init http svc
-	httpSvc := web.NewHttpSvc(&web.Config{
-		ReadSecret:     readSecret,
+	// init app
+	app.NewApp(&app.Cfg{
+		Ctx:            ctx,
 		Buf:            ringBuf,
-		UdpSvc:         udpSvc,
 		AlarmSvc:       alarmSvc,
-		RateLimitEvery: 250 * time.Millisecond,
-		RateLimitBurst: 10,
+		RateLimitEvery: time.Second,
+		RateLimitBurst: 100,
+		Port:           appPort,
 	})
-	go httpSvc.ServeHttp(httpLaddrPort)
 
 	// wait for kill signal
 	<-ctx.Done()

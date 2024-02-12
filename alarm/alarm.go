@@ -9,18 +9,20 @@ import (
 	"time"
 
 	"github.com/swissinfo-ch/logd/cmd"
+	"github.com/swissinfo-ch/logd/ring"
 )
 
 type Svc struct {
 	In        chan *cmd.Msg // buffer doesn't help
 	triggered chan *Alarm   // buffer doesn't help
-	Alarms    map[string]*Alarm
+	alarms    map[string]*Alarm
 	mu        sync.Mutex
 }
 
 type Alarm struct {
 	Name          string
 	Match         func(*cmd.Msg) bool
+	Recent        *ring.RingBuffer
 	Period        time.Duration // period of analysis
 	Threshold     int
 	Events        map[int64]*Event // key is unix milli
@@ -38,7 +40,7 @@ func NewSvc() *Svc {
 	s := &Svc{
 		In:        make(chan *cmd.Msg),
 		triggered: make(chan *Alarm),
-		Alarms:    make(map[string]*Alarm),
+		alarms:    make(map[string]*Alarm),
 	}
 	// we need some gophers
 	// adding more gophers matching messages doesn't help
@@ -50,16 +52,20 @@ func NewSvc() *Svc {
 
 func (s *Svc) Set(al *Alarm) {
 	s.mu.Lock()
-	s.Alarms[al.Name] = al
-	s.Alarms[al.Name].Events = make(map[int64]*Event)
+	s.alarms[al.Name] = al
+	s.alarms[al.Name].Events = make(map[int64]*Event)
 	s.mu.Unlock()
 	fmt.Println("set alarm:", al.Name)
+}
+
+func (s *Svc) GetAll() map[string]*Alarm {
+	return s.alarms
 }
 
 func (s *Svc) matchMsgs() {
 	fmt.Println("alarm-matching gopher started")
 	for msg := range s.In {
-		for _, al := range s.Alarms {
+		for _, al := range s.alarms {
 			if !al.Match(msg) {
 				continue
 			}
@@ -83,7 +89,7 @@ func (s *Svc) matchMsgs() {
 
 func (s *Svc) kickOldEvents() {
 	for {
-		for _, al := range s.Alarms {
+		for _, al := range s.alarms {
 			for i, ev := range al.Events {
 				if ev.Occurred.Before(time.Now().Add(-al.Period)) {
 					al.mu.Lock()
