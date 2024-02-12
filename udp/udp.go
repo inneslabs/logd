@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"net"
 	"net/netip"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -25,7 +24,7 @@ const MaxPacketSize = 1920
 
 type UdpSvc struct {
 	ctx              context.Context
-	laddrPort        int
+	laddrPort        string
 	conn             *net.UDPConn
 	subs             map[string]*Sub
 	subsMu           sync.RWMutex
@@ -41,7 +40,7 @@ type UdpSvc struct {
 
 type Cfg struct {
 	Ctx                 context.Context
-	LaddrPort           int
+	LaddrPort           string
 	ReadSecret          string
 	WriteSecret         string
 	RingBuf             *ring.RingBuffer
@@ -101,7 +100,7 @@ func NewSvc(cfg *Cfg) *UdpSvc {
 }
 
 func (svc *UdpSvc) listen() {
-	l, err := net.ResolveUDPAddr("udp", ":"+strconv.Itoa(svc.laddrPort))
+	l, err := net.ResolveUDPAddr("udp", svc.laddrPort)
 	if err != nil {
 		panic(fmt.Errorf("resolve laddr err: %w", err))
 	}

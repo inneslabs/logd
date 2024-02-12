@@ -13,25 +13,25 @@ import (
 	"time"
 )
 
-type Info struct {
+type status struct {
 	Commit  string         `json:"commit"`
 	Uptime  string         `json:"uptime"`
-	Machine *MachineInfo   `json:"machine"`
-	Buffer  *BufferInfo    `json:"buffer"`
-	Alarms  []*AlarmStatus `json:"alarms"`
+	Machine *machineInfo   `json:"machine"`
+	Buffer  *bufferInfo    `json:"buffer"`
+	Alarms  []*alarmStatus `json:"alarms"`
 }
 
-type MachineInfo struct {
+type machineInfo struct {
 	NumCpu int `json:"numCpu"`
 }
 
-type BufferInfo struct {
+type bufferInfo struct {
 	Writes         uint64 `json:"writes"`
 	Size           uint32 `json:"size"`
 	MaxWritePerSec uint64 `json:"maxWritePerSec"`
 }
 
-type AlarmStatus struct {
+type alarmStatus struct {
 	Name              string `json:"name"`
 	Period            string `json:"period"`
 	Threshold         int    `json:"threshold"`
@@ -39,13 +39,13 @@ type AlarmStatus struct {
 	TimeLastTriggered int64  `json:"timeLastTriggered"`
 }
 
-func (app *App) handleInfo(w http.ResponseWriter, r *http.Request) {
+func (app *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Content-Length", strconv.Itoa(len(app.infoJson)))
-	w.Write(app.infoJson)
+	w.Header().Set("Content-Length", strconv.Itoa(len(app.statusJson)))
+	w.Write(app.statusJson)
 }
 
-func (app *App) measureInfo() {
+func (app *App) measureStatus() {
 	numCpu := runtime.NumCPU()
 	bufSize := app.buf.Size()
 	lastWrites := uint64(0)
@@ -67,22 +67,22 @@ func (app *App) measureInfo() {
 
 			alarms := app.alarmSvc.GetAll()
 
-			info := &Info{
+			info := &status{
 				Commit: app.commit,
 				Uptime: time.Since(app.started).String(),
-				Machine: &MachineInfo{
+				Machine: &machineInfo{
 					NumCpu: numCpu,
 				},
-				Buffer: &BufferInfo{
+				Buffer: &bufferInfo{
 					Writes:         currentWrites,
 					Size:           bufSize,
 					MaxWritePerSec: maxWritePerSec,
 				},
-				Alarms: make([]*AlarmStatus, 0, len(alarms)),
+				Alarms: make([]*alarmStatus, 0, len(alarms)),
 			}
 
 			for _, a := range alarms {
-				info.Alarms = append(info.Alarms, &AlarmStatus{
+				info.Alarms = append(info.Alarms, &alarmStatus{
 					Name:              a.Name,
 					Period:            a.Period.String(),
 					Threshold:         a.Threshold,
@@ -101,9 +101,9 @@ func (app *App) measureInfo() {
 				panic(fmt.Sprintf("failed to marshal json: %s", err))
 			}
 
-			app.infoJson = data
+			app.statusJson = data
 		case <-app.ctx.Done():
-
+			fmt.Println("measureStatus ending")
 		}
 	}
 }

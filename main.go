@@ -22,12 +22,18 @@ func main() {
 	// no default, can also be blank
 	readSecret := os.Getenv("LOGD_READ_SECRET")
 	writeSecret := os.Getenv("LOGD_WRITE_SECRET")
+	accessControlAllowOrigin := os.Getenv("LOGD_ACCESS_CONTROL_ALLOW_ORIGIN")
 	slackWebhook := os.Getenv("LOGD_SLACK_WEBHOOK")
 
 	// defaults
+	udpLaddrPort := ":6102" // string supports fly-global-services:6102
 	appPort := 6101
-	udpPort := 6102
 	bufferSize := 1000000
+
+	udpPortEnv, set := os.LookupEnv("LOGD_UDP_LADDRPORT")
+	if set {
+		udpLaddrPort = udpPortEnv
+	}
 
 	appPortEnv, set := os.LookupEnv("LOGD_APP_PORT")
 	if set {
@@ -35,15 +41,6 @@ func main() {
 		appPort, err = strconv.Atoi(appPortEnv)
 		if err != nil {
 			panic("LOGD_APP_PORT must be an int")
-		}
-	}
-
-	udpPortEnv, set := os.LookupEnv("LOGD_UDP_PORT")
-	if set {
-		var err error
-		udpPort, err = strconv.Atoi(udpPortEnv)
-		if err != nil {
-			panic("LOGD_UDP_PORT must be an int")
 		}
 	}
 
@@ -56,9 +53,12 @@ func main() {
 		}
 	}
 
+	fmt.Println("udp port set to", udpLaddrPort)
+	fmt.Println("app port set to", appPort)
+	fmt.Println("buffer size set to", bufferSize)
+
 	// init ring buffer
 	ringBuf := ring.NewRingBuffer(uint32(bufferSize))
-	fmt.Printf("created ring buffer with capacity %d\n", bufferSize)
 
 	// init alarms
 	alarmSvc := alarm.NewSvc()
@@ -71,7 +71,7 @@ func main() {
 	// init udp
 	udp.NewSvc(&udp.Cfg{
 		Ctx:                 ctx,
-		LaddrPort:           udpPort,
+		LaddrPort:           udpLaddrPort,
 		ReadSecret:          readSecret,
 		WriteSecret:         writeSecret,
 		RingBuf:             ringBuf,
@@ -84,12 +84,13 @@ func main() {
 
 	// init app
 	app.NewApp(&app.Cfg{
-		Ctx:            ctx,
-		Buf:            ringBuf,
-		AlarmSvc:       alarmSvc,
-		RateLimitEvery: time.Second,
-		RateLimitBurst: 100,
-		Port:           appPort,
+		Ctx:                      ctx,
+		Buf:                      ringBuf,
+		AlarmSvc:                 alarmSvc,
+		RateLimitEvery:           time.Second,
+		RateLimitBurst:           10,
+		Port:                     appPort,
+		AccessControlAllowOrigin: accessControlAllowOrigin,
 	})
 
 	// wait for kill signal

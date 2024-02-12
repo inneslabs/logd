@@ -8,12 +8,6 @@ Logd will never run out of memory if the buffer size is ok for the given machine
 
 As the buffer becomes full, each write overwrites the oldest element.
 
-# Feedback from GPT-4
-- [RingBuffer](.doc/ring-feedback.md)
-- [UdpSvc](.doc/udp-feedback.md)
-- [Monitoring](.doc/info-feedback.md)
-- [Alarms](.doc/alarm-feedback.md)
-
 # To Do
 ## Fix Replay Vulnerability
 There is currently no cache of UDP packet hashes, so we can't yet detect/prevent a replay. A ring buffer would probably be ideal for this.

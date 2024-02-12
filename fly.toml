@@ -17,6 +17,7 @@ primary_region = "ams"
 
 [env]
   LOGD_UDP_LADDRPORT = "fly-global-services:6102"
+  LOGD_ACCESS_CONTROL_ALLOW_ORIGIN = "*"
   # set secrets for
   # LOGD_READ_SECRET
   # LOGD_WRITE_SECRET

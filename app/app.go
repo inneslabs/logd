@@ -26,11 +26,11 @@ type App struct {
 	rateLimitBurst           int
 	accessControlAllowOrigin string
 	// state
-	commit   string
-	started  time.Time
-	clientMu sync.Mutex
-	clients  map[string]*client
-	infoJson []byte
+	commit     string
+	started    time.Time
+	clientMu   sync.Mutex
+	clients    map[string]*client
+	statusJson []byte
 }
 
 type Cfg struct {
@@ -55,15 +55,21 @@ func NewApp(cfg *Cfg) *App {
 		panic(fmt.Sprintf("failed to read commit file: %s", err))
 	}
 	app := &App{
-		ctx:      cfg.Ctx,
-		port:     cfg.Port,
-		buf:      cfg.Buf,
-		alarmSvc: cfg.AlarmSvc,
-		started:  time.Now(),
-		commit:   string(commit),
+		// cfg
+		ctx:                      cfg.Ctx,
+		port:                     cfg.Port,
+		buf:                      cfg.Buf,
+		alarmSvc:                 cfg.AlarmSvc,
+		rateLimitEvery:           cfg.RateLimitEvery,
+		rateLimitBurst:           cfg.RateLimitBurst,
+		accessControlAllowOrigin: cfg.AccessControlAllowOrigin,
+		// state
+		started: time.Now(),
+		commit:  string(commit),
+		clients: make(map[string]*client),
 	}
 	go app.cleanupClients()
-	go app.measureInfo()
+	go app.measureStatus()
 	go app.serve()
 	return app
 }
@@ -90,12 +96,13 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	app.handleInfo(w, r)
+	app.handleStatus(w, r)
 }
 
 func (app *App) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Access-Control-Allow-Origin", app.accessControlAllowOrigin)
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Fly-Client-IP")
 		w.Header().Set("Access-Control-Allow-Methods", "GET")
 		next.ServeHTTP(w, r)
 	})
