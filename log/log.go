@@ -49,7 +49,7 @@ func NewLogger(cfg *LoggerConfig) (*Logger, error) {
 	return &Logger{
 		ctx:         cfg.Ctx,
 		conn:        conn,
-		rateLimiter: rate.NewLimiter(rate.Every(time.Microsecond*100), 10),
+		rateLimiter: rate.NewLimiter(rate.Every(time.Microsecond*250), 20),
 		secret:      []byte(cfg.WriteSecret),
 		env:         cfg.Env,
 		svc:         cfg.Svc,

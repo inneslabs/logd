@@ -60,9 +60,9 @@ func main() {
 		WriteSecret:         writeSecret,
 		RingBuf:             ringBuf,
 		AlarmSvc:            alarmSvc,
-		SubRateLimitEvery:   100 * time.Microsecond,
-		SubRateLimitBurst:   10,
-		QueryRateLimitEvery: 10 * time.Millisecond,
+		SubRateLimitEvery:   250 * time.Microsecond,
+		SubRateLimitBurst:   20,
+		QueryRateLimitEvery: 20 * time.Millisecond,
 		QueryRateLimitBurst: 10,
 	})
 	go udpSvc.Listen(ctx)
