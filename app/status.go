@@ -11,6 +11,8 @@ import (
 	"sort"
 	"strconv"
 	"time"
+
+	"github.com/swissinfo-ch/logd/alarm"
 )
 
 type Status struct {
@@ -34,8 +36,8 @@ type BufferInfo struct {
 type AlarmStatus struct {
 	Name              string `json:"name"`
 	Period            string `json:"period"`
-	Threshold         int    `json:"threshold"`
-	LenEvents         int    `json:"lenEvents"`
+	Threshold         int32  `json:"threshold"`
+	EventCount        int32  `json:"eventCount"`
 	TimeLastTriggered int64  `json:"timeLastTriggered"`
 }
 
@@ -65,7 +67,15 @@ func (app *App) measureStatus() {
 			lastWrites = currentWrites
 			lastTime = time.Now()
 
-			alarms := app.alarmSvc.GetAll()
+			alarms := make([]*alarm.Alarm, 0, 10)
+			app.alarmSvc.Alarms.Range(func(key, value any) bool {
+				al, ok := value.(*alarm.Alarm)
+				if !ok {
+					return true
+				}
+				alarms = append(alarms, al)
+				return true
+			})
 
 			info := &Status{
 				Commit: app.commit,
@@ -86,7 +96,7 @@ func (app *App) measureStatus() {
 					Name:              a.Name,
 					Period:            a.Period.String(),
 					Threshold:         a.Threshold,
-					LenEvents:         len(a.Events),
+					EventCount:        a.EventCount.Load(),
 					TimeLastTriggered: a.LastTriggered.UnixMilli(),
 				})
 			}

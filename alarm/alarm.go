@@ -6,17 +6,17 @@ package alarm
 import (
 	"fmt"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/swissinfo-ch/logd/cmd"
 	"github.com/swissinfo-ch/logd/ring"
 )
 
-type Svc struct {
+type AlarmSvc struct {
 	In        chan *cmd.Msg // buffer doesn't help
 	triggered chan *Alarm   // buffer doesn't help
-	alarms    map[string]*Alarm
-	mu        sync.Mutex
+	Alarms    sync.Map
 }
 
 type Alarm struct {
@@ -24,11 +24,11 @@ type Alarm struct {
 	Match         func(*cmd.Msg) bool
 	Recent        *ring.RingBuffer
 	Period        time.Duration // period of analysis
-	Threshold     int
-	Events        map[int64]*Event // key is unix milli
+	Threshold     int32
+	Events        sync.Map // key is unix milli
+	EventCount    atomic.Int32
 	Action        func() error
 	LastTriggered time.Time
-	mu            sync.Mutex
 }
 
 type Event struct {
@@ -36,75 +36,84 @@ type Event struct {
 	Occurred time.Time
 }
 
-func NewSvc() *Svc {
-	s := &Svc{
-		In:        make(chan *cmd.Msg),
+func NewSvc() *AlarmSvc {
+	s := &AlarmSvc{
+		In:        make(chan *cmd.Msg, 100),
 		triggered: make(chan *Alarm),
-		alarms:    make(map[string]*Alarm),
 	}
 	// we need some gophers
 	// adding more gophers matching messages doesn't help
-	go s.matchMsgs()
+	for i := 0; i < 4; i++ {
+		go s.matchMsgs()
+	}
 	go s.kickOldEvents()
 	go s.callActions()
 	return s
 }
 
-func (s *Svc) Set(al *Alarm) {
-	s.mu.Lock()
-	s.alarms[al.Name] = al
-	s.alarms[al.Name].Events = make(map[int64]*Event)
-	s.mu.Unlock()
+func (svc *AlarmSvc) Set(al *Alarm) {
+	svc.Alarms.Store(al.Name, al)
 	fmt.Println("set alarm:", al.Name)
 }
 
-func (s *Svc) GetAll() map[string]*Alarm {
-	return s.alarms
-}
-
-func (s *Svc) matchMsgs() {
+func (svc *AlarmSvc) matchMsgs() {
 	fmt.Println("alarm-matching gopher started")
-	for msg := range s.In {
-		for _, al := range s.alarms {
-			if !al.Match(msg) {
-				continue
+	for msg := range svc.In {
+		t := msg.T.AsTime().UnixMicro()
+		svc.Alarms.Range(func(key, value interface{}) bool {
+			al, ok := value.(*Alarm) // Type assertion
+			if !ok {
+				return true // continue iteration
 			}
-			al.Events[msg.T.AsTime().UnixMicro()] = &Event{
+			// Use al
+			if !al.Match(msg) {
+				return true // continue iteration
+			}
+			al.Events.Store(t, &Event{
 				Msg:      msg,
 				Occurred: time.Now(),
-			}
-			if len(al.Events) >= al.Threshold {
+			})
+			al.EventCount.Add(1)
+			if al.EventCount.Load() >= al.Threshold {
 				if al.LastTriggered.After(time.Now().Add(-al.Period)) {
-					continue
+					return true
 				}
-				s.triggered <- al
-				al.mu.Lock()
-				al.Events = make(map[int64]*Event)
-				al.LastTriggered = time.Now()
-				al.mu.Unlock()
+				svc.triggered <- al
 			}
-		}
+
+			return true // continue iteration
+		})
 	}
 }
 
-func (s *Svc) kickOldEvents() {
+func (svc *AlarmSvc) kickOldEvents() {
 	for {
-		for _, al := range s.alarms {
-			for i, ev := range al.Events {
-				if ev.Occurred.Before(time.Now().Add(-al.Period)) {
-					al.mu.Lock()
-					delete(al.Events, i)
-					al.mu.Unlock()
-				}
+		svc.Alarms.Range(func(key, value interface{}) bool {
+			al, ok := value.(*Alarm) // Type assertion
+			if !ok {
+				return true // continue iteration
 			}
-		}
-		time.Sleep(time.Second)
+			al.Events.Range(func(i, ev interface{}) bool {
+				event, ok := ev.(*Event) // Type assertion
+				if !ok {
+					return true // continue iteration
+				}
+				if event.Occurred.Before(time.Now().Add(-al.Period)) {
+					al.Events.Delete(i)
+					al.EventCount.Add(-1)
+				}
+				return true // continue iteration
+			})
+			return true // continue iteration
+		})
+		time.Sleep(time.Second * 10)
 	}
 }
 
-func (s *Svc) callActions() {
-	for a := range s.triggered {
+func (svc *AlarmSvc) callActions() {
+	for a := range svc.triggered {
 		fmt.Println("alarm triggered:", a.Name)
+		a.LastTriggered = time.Now()
 		err := a.Action()
 		if err != nil {
 			fmt.Println("alarm action err:", err)

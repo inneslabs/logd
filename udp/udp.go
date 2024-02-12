@@ -35,7 +35,7 @@ type UdpSvc struct {
 	writeSecret      []byte
 	ringBuf          *ring.RingBuffer
 	unpkPool         *sync.Pool
-	alarmSvc         *alarm.Svc
+	alarmSvc         *alarm.AlarmSvc
 }
 
 type Cfg struct {
@@ -44,7 +44,7 @@ type Cfg struct {
 	ReadSecret          string
 	WriteSecret         string
 	RingBuf             *ring.RingBuffer
-	AlarmSvc            *alarm.Svc
+	AlarmSvc            *alarm.AlarmSvc
 	SubRateLimitEvery   time.Duration
 	SubRateLimitBurst   int
 	QueryRateLimitEvery time.Duration
@@ -112,7 +112,7 @@ func (svc *UdpSvc) listen() {
 	fmt.Println("listening udp on", svc.conn.LocalAddr())
 
 	// one gopher reads packets
-	packets := make(chan *Packet, 100)
+	packets := make(chan *Packet, 10)
 	go func() {
 		fmt.Printf("packet-reading gopher started\n")
 		for {
@@ -120,13 +120,15 @@ func (svc *UdpSvc) listen() {
 		}
 	}()
 
-	// one gopher handles packets
-	go func() {
-		fmt.Printf("packet-handling gopher started\n")
-		for {
-			svc.handlePacket(<-packets)
-		}
-	}()
+	// gophers handle packets
+	for i := 0; i < 4; i++ {
+		go func(i int) {
+			fmt.Printf("packet-handling gopher %d started\n", i)
+			for {
+				svc.handlePacket(<-packets)
+			}
+		}(i)
+	}
 
 	// wait for the gopher party to end
 	<-svc.ctx.Done()

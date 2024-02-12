@@ -21,7 +21,7 @@ type App struct {
 	ctx                      context.Context
 	port                     int
 	buf                      *ring.RingBuffer
-	alarmSvc                 *alarm.Svc
+	alarmSvc                 *alarm.AlarmSvc
 	rateLimitEvery           time.Duration
 	rateLimitBurst           int
 	accessControlAllowOrigin string
@@ -37,7 +37,7 @@ type Cfg struct {
 	Ctx                      context.Context
 	Port                     int
 	Buf                      *ring.RingBuffer
-	AlarmSvc                 *alarm.Svc
+	AlarmSvc                 *alarm.AlarmSvc
 	RateLimitEvery           time.Duration
 	RateLimitBurst           int
 	AccessControlAllowOrigin string
