@@ -13,25 +13,25 @@ import (
 	"time"
 )
 
-type status struct {
+type Status struct {
 	Commit  string         `json:"commit"`
 	Uptime  string         `json:"uptime"`
-	Machine *machineInfo   `json:"machine"`
-	Buffer  *bufferInfo    `json:"buffer"`
-	Alarms  []*alarmStatus `json:"alarms"`
+	Machine *MachineInfo   `json:"machine"`
+	Buffer  *BufferInfo    `json:"buffer"`
+	Alarms  []*AlarmStatus `json:"alarms"`
 }
 
-type machineInfo struct {
+type MachineInfo struct {
 	NumCpu int `json:"numCpu"`
 }
 
-type bufferInfo struct {
+type BufferInfo struct {
 	Writes         uint64 `json:"writes"`
 	Size           uint32 `json:"size"`
 	MaxWritePerSec uint64 `json:"maxWritePerSec"`
 }
 
-type alarmStatus struct {
+type AlarmStatus struct {
 	Name              string `json:"name"`
 	Period            string `json:"period"`
 	Threshold         int    `json:"threshold"`
@@ -67,22 +67,22 @@ func (app *App) measureStatus() {
 
 			alarms := app.alarmSvc.GetAll()
 
-			info := &status{
+			info := &Status{
 				Commit: app.commit,
 				Uptime: time.Since(app.started).String(),
-				Machine: &machineInfo{
+				Machine: &MachineInfo{
 					NumCpu: numCpu,
 				},
-				Buffer: &bufferInfo{
+				Buffer: &BufferInfo{
 					Writes:         currentWrites,
 					Size:           bufSize,
 					MaxWritePerSec: maxWritePerSec,
 				},
-				Alarms: make([]*alarmStatus, 0, len(alarms)),
+				Alarms: make([]*AlarmStatus, 0, len(alarms)),
 			}
 
 			for _, a := range alarms {
-				info.Alarms = append(info.Alarms, &alarmStatus{
+				info.Alarms = append(info.Alarms, &AlarmStatus{
 					Name:              a.Name,
 					Period:            a.Period.String(),
 					Threshold:         a.Threshold,
