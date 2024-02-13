@@ -50,8 +50,8 @@ func prodErrors(slackWebhook string) *alarm.Alarm {
 			}
 			return true
 		},
-		Period:    time.Minute * 10,
-		Threshold: 50,
+		Period:    time.Hour,
+		Threshold: 1000,
 	}
 	a.Action = func() error {
 		return alarm.SendSlackMsg(

@@ -110,6 +110,7 @@ func (svc *AlarmSvc) kickOldEvents() {
 	}
 }
 
+// callActions is a gopher that listens for triggered alarms
 func (svc *AlarmSvc) callActions() {
 	for a := range svc.triggered {
 		fmt.Println("alarm triggered:", a.Name)
@@ -118,5 +119,8 @@ func (svc *AlarmSvc) callActions() {
 		if err != nil {
 			fmt.Println("alarm action err:", err)
 		}
+		// reset events & event count
+		a.Events = sync.Map{}
+		a.EventCount.Store(0)
 	}
 }
