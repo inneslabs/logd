@@ -22,13 +22,13 @@ func main() {
 	// no default, can also be blank
 	readSecret := os.Getenv("LOGD_READ_SECRET")
 	writeSecret := os.Getenv("LOGD_WRITE_SECRET")
-	accessControlAllowOrigin := os.Getenv("LOGD_ACCESS_CONTROL_ALLOW_ORIGIN")
 	slackWebhook := os.Getenv("LOGD_SLACK_WEBHOOK")
 
 	// defaults
 	udpLaddrPort := ":6102" // string supports fly-global-services:6102
 	appPort := 6101
 	bufferSize := 1000000
+	accessControlAllowOrigin := "*"
 
 	udpPortEnv, set := os.LookupEnv("LOGD_UDP_LADDRPORT")
 	if set {
@@ -53,9 +53,16 @@ func main() {
 		}
 	}
 
+	accessControlAllowOriginEnv, set := os.LookupEnv("LOGD_ACCESS_CONTROL_ALLOW_ORIGIN")
+	if set {
+		accessControlAllowOrigin = accessControlAllowOriginEnv
+	}
+
+	// print config insensitive config
 	fmt.Println("udp port set to", udpLaddrPort)
 	fmt.Println("app port set to", appPort)
 	fmt.Println("buffer size set to", bufferSize)
+	fmt.Println("access-control-allow-origin set to", accessControlAllowOrigin)
 
 	// init ring buffer
 	ringBuf := ring.NewRingBuffer(uint32(bufferSize))

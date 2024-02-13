@@ -12,7 +12,7 @@ import (
 )
 
 func prodWpErrors(slackWebhook string) *alarm.Alarm {
-	return &alarm.Alarm{
+	a := &alarm.Alarm{
 		Name: "prod/wp/error",
 		Match: func(m *cmd.Msg) bool {
 			if m.GetResponseStatus() != 200 {
@@ -28,10 +28,14 @@ func prodWpErrors(slackWebhook string) *alarm.Alarm {
 		},
 		Period:    time.Minute * 10,
 		Threshold: 10,
-		Action: func() error {
-			return alarm.SendSlackMsg("We've had 10 errors on prod/wp in the last 10 minutes.", slackWebhook)
-		},
 	}
+	a.Action = func() error {
+		return alarm.SendSlackMsg(
+			fmt.Sprintf("We've had %d errors on prod/wp in the last %s.",
+				a.EventCount.Load(), a.Period.String()),
+			slackWebhook)
+	}
+	return a
 }
 
 func prodErrors(slackWebhook string) *alarm.Alarm {
@@ -52,7 +56,7 @@ func prodErrors(slackWebhook string) *alarm.Alarm {
 	a.Action = func() error {
 		return alarm.SendSlackMsg(
 			fmt.Sprintf("We've had %d errors on prod in the last %s.",
-				a.Threshold, a.Period.String()),
+				a.EventCount.Load(), a.Period.String()),
 			slackWebhook)
 	}
 	return a
