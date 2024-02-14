@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/intob/jfmt"
 	"github.com/swissinfo-ch/logd/alarm"
 )
 
@@ -80,7 +81,7 @@ func (app *App) measureStatus() {
 
 			info := &Status{
 				Commit: app.commit,
-				Uptime: time.Since(app.started).String(),
+				Uptime: jfmt.FmtDuration(time.Since(app.started)),
 				Machine: &MachineInfo{
 					NumCpu: numCpu,
 				},
@@ -95,7 +96,7 @@ func (app *App) measureStatus() {
 			for _, a := range alarms {
 				info.Alarms = append(info.Alarms, &AlarmStatus{
 					Name:              a.Name,
-					Period:            a.Period.String(),
+					Period:            jfmt.FmtDuration(a.Period),
 					Threshold:         a.Threshold,
 					EventCount:        a.EventCount.Load(),
 					TimeLastTriggered: a.LastTriggered.UnixMilli(),
