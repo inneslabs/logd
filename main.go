@@ -12,8 +12,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/intob/jfmt"
 	"github.com/swissinfo-ch/logd/alarm"
 	"github.com/swissinfo-ch/logd/app"
+	"github.com/swissinfo-ch/logd/cmd"
 	"github.com/swissinfo-ch/logd/ring"
 	"github.com/swissinfo-ch/logd/udp"
 )
@@ -69,7 +71,8 @@ func main() {
 
 	// init alarms
 	alarmSvc := alarm.NewSvc()
-	alarmSvc.Set(prodErrors(slackWebhook))
+	alarmSvc.Set(prodErrorsDaily(slackWebhook))
+	alarmSvc.Set(prodErrorsDaily(slackWebhook))
 
 	// init root context
 	ctx := getCtx()
@@ -102,6 +105,61 @@ func main() {
 	// wait for kill signal
 	<-ctx.Done()
 	fmt.Println("all routines ended")
+}
+
+// prodErrors returns an alarm that triggers on prod errors hourly
+func prodErrorsHourly(slackWebhook string) *alarm.Alarm {
+	a := &alarm.Alarm{
+		Name: "Prod errors hourly",
+		Match: func(m *cmd.Msg) bool {
+			if m.GetLvl() != cmd.Lvl_ERROR {
+				return false
+			}
+			if m.GetEnv() != "prod" {
+				return false
+			}
+			return true
+		},
+		Period:    time.Hour,
+		Threshold: 100,
+	}
+	a.Action = func() error {
+		top5 := alarm.GenerateTopNView(a.Report, 5)
+		msg := fmt.Sprintf("We've had %d errors on prod in the last %s.\n\nTop 5 errors:\n%s",
+			a.EventCount.Load(),
+			jfmt.FmtDuration(a.Period),
+			top5)
+		fmt.Println(msg)
+		return alarm.SendSlackMsg(msg, slackWebhook)
+	}
+	return a
+}
+
+func prodErrorsDaily(slackWebhook string) *alarm.Alarm {
+	a := &alarm.Alarm{
+		Name: "Prod errors daily",
+		Match: func(m *cmd.Msg) bool {
+			if m.GetLvl() != cmd.Lvl_ERROR {
+				return false
+			}
+			if m.GetEnv() != "prod" {
+				return false
+			}
+			return true
+		},
+		Period:    24 * time.Hour,
+		Threshold: 1,
+	}
+	a.Action = func() error {
+		top5 := alarm.GenerateTopNView(a.Report, 5)
+		msg := fmt.Sprintf("We've had %d errors on prod in the last %s.\n\nTop 5 errors:\n%s",
+			a.EventCount.Load(),
+			jfmt.FmtDuration(a.Period),
+			top5)
+		fmt.Println(msg)
+		return alarm.SendSlackMsg(msg, slackWebhook)
+	}
+	return a
 }
 
 // cancelOnKillSig cancels the context on os interrupt kill signal
