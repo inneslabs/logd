@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/intob/jfmt"
 	"github.com/swissinfo-ch/logd/alarm"
 	"github.com/swissinfo-ch/logd/cmd"
 )
@@ -28,9 +29,9 @@ func prodErrors(slackWebhook string) *alarm.Alarm {
 	}
 	a.Action = func() error {
 		top5 := alarm.GenerateTopNView(a.Report, 5)
-		msg := fmt.Sprintf("We've had %d errors on prod in the last %s. Top5:\n%s",
+		msg := fmt.Sprintf("We've had %d errors on prod in the last %s. Top 5:\n%s",
 			a.EventCount.Load(),
-			a.Period.String(),
+			jfmt.FmtDuration(a.Period),
 			top5)
 		fmt.Println(msg)
 		return alarm.SendSlackMsg(msg, slackWebhook)
