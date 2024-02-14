@@ -29,7 +29,7 @@ func prodErrors(slackWebhook string) *alarm.Alarm {
 	}
 	a.Action = func() error {
 		top5 := alarm.GenerateTopNView(a.Report, 5)
-		msg := fmt.Sprintf("We've had %d errors on prod in the last %s. Top 5:\n%s",
+		msg := fmt.Sprintf("We've had %d errors on prod in the last %s.\n\nTop 5 errors:\n%s",
 			a.EventCount.Load(),
 			jfmt.FmtDuration(a.Period),
 			top5)
