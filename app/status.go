@@ -34,11 +34,12 @@ type BufferInfo struct {
 }
 
 type AlarmStatus struct {
-	Name              string `json:"name"`
-	Period            string `json:"period"`
-	Threshold         int32  `json:"threshold"`
-	EventCount        int32  `json:"eventCount"`
-	TimeLastTriggered int64  `json:"timeLastTriggered"`
+	Name              string        `json:"name"`
+	Period            string        `json:"period"`
+	Threshold         int32         `json:"threshold"`
+	EventCount        int32         `json:"eventCount"`
+	TimeLastTriggered int64         `json:"timeLastTriggered"`
+	Report            *alarm.Report `json:"report"`
 }
 
 func (app *App) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -114,6 +115,7 @@ func (app *App) measureStatus() {
 			app.statusJson = data
 		case <-app.ctx.Done():
 			fmt.Println("measureStatus ending")
+			return
 		}
 	}
 }

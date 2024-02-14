@@ -69,7 +69,6 @@ func main() {
 
 	// init alarms
 	alarmSvc := alarm.NewSvc()
-	alarmSvc.Set(prodWpErrors(slackWebhook))
 	alarmSvc.Set(prodErrors(slackWebhook))
 
 	// init root context

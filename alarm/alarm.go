@@ -20,13 +20,15 @@ type AlarmSvc struct {
 }
 
 type Alarm struct {
-	Name          string
-	Match         func(*cmd.Msg) bool
-	Recent        *ring.RingBuffer
-	Period        time.Duration // period of analysis
-	Threshold     int32
+	Name      string
+	Match     func(*cmd.Msg) bool
+	Recent    *ring.RingBuffer
+	Period    time.Duration // period of analysis
+	Threshold int32
+	// using sync.Map for better concurrent access
 	Events        sync.Map // key is unix milli
 	EventCount    atomic.Int32
+	Report        *Report
 	Action        func() error
 	LastTriggered time.Time
 }
@@ -61,11 +63,12 @@ func (svc *AlarmSvc) matchMsgs() {
 	for msg := range svc.In {
 		t := msg.T.AsTime().UnixMicro()
 		svc.Alarms.Range(func(key, value interface{}) bool {
-			al, ok := value.(*Alarm) // Type assertion
+			// Type assertion
+			al, ok := value.(*Alarm)
 			if !ok {
 				return true // continue iteration
 			}
-			// Use al
+			// Use alarm's match function
 			if !al.Match(msg) {
 				return true // continue iteration
 			}
@@ -110,11 +113,12 @@ func (svc *AlarmSvc) kickOldEvents() {
 	}
 }
 
-// callActions is a gopher that listens for triggered alarms
+// callActions of triggered alarms
 func (svc *AlarmSvc) callActions() {
 	for a := range svc.triggered {
 		fmt.Println("alarm triggered:", a.Name)
 		a.LastTriggered = time.Now()
+		a.createReport()
 		err := a.Action()
 		if err != nil {
 			fmt.Println("alarm action err:", err)
