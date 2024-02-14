@@ -56,10 +56,10 @@ func GenerateTopNView(report *Report, topN int) string {
 		if i >= topN {
 			break
 		}
-		reportLines = append(reportLines, fmt.Sprintf("%s/%s: 1 sample of %d: %s",
+		reportLines = append(reportLines, fmt.Sprintf("[%d] %s/%s: %s",
+			pair.EventCount,
 			pair.SvcName,
 			pair.FnName,
-			pair.EventCount,
 			pair.Sample.GetTxt()))
 	}
 
