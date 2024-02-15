@@ -9,10 +9,18 @@ Logd will never run out of memory if the buffer size is ok for the given machine
 As the buffer becomes full, each write overwrites the oldest element.
 
 # To Do
+## Use circular buffer per alarm to store events
+Currently, the app will OOM if we get a million errors. To solve this, use a circular buffer, as already used for main storage.
+`Estimated time: 2 hours`
+
+## Cleaner way of sending daily or hourly reports
+Currently, the Period & Threshold are used to configure an alarm that fires daily. This is not a nice pattern. The intent of the alarm service does not align with the intent of that alarm configuration.
+A better solution would be to trigger a report on a daily basis, using an alarm that collects the events but has no action.
+`Estimated time: 2 hours`
+
 ## Fix Replay Vulnerability
 There is currently no cache of UDP packet hashes, so we can't yet detect/prevent a replay. A ring buffer would probably be ideal for this.
-
-Estimated time start-to-prod: 2-3 hours.
+`Estimated time: 2 hours`
 
 # Auth
 Logd authenticates clients for either reading or writing using 2 shared secrets.
