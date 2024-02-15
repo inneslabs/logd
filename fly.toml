@@ -1,48 +1,37 @@
-# fly.toml app configuration file generated for logd on 2024-01-05T16:53:53+01:00
+# fly.toml app configuration file generated for swi-logd on 2024-02-15T10:10:07+01:00
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = "logd"
-primary_region = "ams"
+app = 'swi-logd'
+primary_region = 'ams'
 
 [build]
-  dockerfile = "fly.Dockerfile"
+  dockerfile = 'fly.Dockerfile'
 
 [deploy]
-  strategy = "immediate"
-
-[runtime]
-  swap_size_mb = 2048
+  strategy = 'immediate'
 
 [env]
-  LOGD_UDP_LADDRPORT = "fly-global-services:6102"
-  LOGD_ACCESS_CONTROL_ALLOW_ORIGIN = "*"
-  # set secrets for
-  # LOGD_READ_SECRET
-  # LOGD_WRITE_SECRET
-  # LOGD_SLACK_WEBHOOK
-
-[mounts]
-  source = "data"
-  destination = "/data"
+  LOGD_ACCESS_CONTROL_ALLOW_ORIGIN = '*'
+  LOGD_UDP_LADDRPORT = 'fly-global-services:6102'
 
 [[services]]
-  protocol = "tcp"
+  protocol = 'tcp'
   internal_port = 6101
 
-  [[services.ports]]
+[[services.ports]]
     port = 443
-    handlers = ["tls", "http"]
+    handlers = ['tls', 'http']
 
 [[services]]
-  protocol = "udp"
+  protocol = 'udp'
   internal_port = 6102
 
-  [[services.ports]]
+[[services.ports]]
     port = 6102
 
 [[vm]]
-  memory = "2GB"
+  memory = '1gb'
+  cpu_kind = 'shared'
   cpus = 1
-  cpu_kind = "shared"
