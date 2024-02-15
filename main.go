@@ -168,6 +168,9 @@ func prodErrorsHourly(slackWebhook string) *alarm.Alarm {
 	return a
 }
 
+// prodErrorsDaily returns an alarm that triggers on prod errors daily
+// TODO: make a cleaner way of sending daily or hourly reports,
+// other than period & threshold based
 func prodErrorsDaily(slackWebhook string) *alarm.Alarm {
 	a := &alarm.Alarm{
 		Name: "Prod errors daily",
@@ -180,15 +183,10 @@ func prodErrorsDaily(slackWebhook string) *alarm.Alarm {
 			}
 			return true
 		},
-		Period:    time.Hour, // try to fire hourly
-		Threshold: 1,         // always send daily report when we have errors
+		Period:    24 * time.Hour,
+		Threshold: 1, // always send daily report when we have errors
 	}
-	// send error report between 09:00 and 09:59
 	a.Action = func() error {
-		if time.Now().Hour() == 9 {
-			fmt.Println("skipped daily report, it's not 09:00")
-			return nil
-		}
 		top10 := alarm.GenerateTopNView(a.Report, 10)
 		msg := fmt.Sprintf("%s: We've had %d errors on prod in the last %s.\n\nTop 10 errors:\n%s",
 			a.Name,
