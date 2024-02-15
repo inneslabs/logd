@@ -71,7 +71,8 @@ func main() {
 
 	// init alarms
 	alarmSvc := alarm.NewSvc()
-	alarmSvc.Set(prodErrorsDaily(slackWebhook))
+	alarmSvc.Set(prodErrors10Min(slackWebhook))
+	alarmSvc.Set(prodErrorsHourly(slackWebhook))
 	alarmSvc.Set(prodErrorsDaily(slackWebhook))
 
 	// init root context
@@ -107,8 +108,39 @@ func main() {
 	fmt.Println("all routines ended")
 }
 
+// prodErrors10Min returns an alarm that triggers on 10K prod errors in 10 minutes
+func prodErrors10Min(slackWebhook string) *alarm.Alarm {
+	// build alarm
+	a := &alarm.Alarm{
+		Name: "10K prod errors in 10 minutes",
+		Match: func(m *cmd.Msg) bool {
+			if m.GetLvl() != cmd.Lvl_ERROR {
+				return false
+			}
+			if m.GetEnv() != "prod" {
+				return false
+			}
+			return true
+		},
+		Period:    10 * time.Minute,
+		Threshold: 10000,
+	}
+	a.Action = func() error {
+		top5 := alarm.GenerateTopNView(a.Report, 5)
+		msg := fmt.Sprintf("%s: We've had %d errors on prod in the last %s.\n\nTop 5 errors:\n%s",
+			a.Name,
+			a.EventCount.Load(),
+			jfmt.FmtDuration(a.Period),
+			top5)
+		fmt.Println(msg)
+		return alarm.SendSlackMsg(msg, slackWebhook)
+	}
+	return a
+}
+
 // prodErrors returns an alarm that triggers on prod errors hourly
 func prodErrorsHourly(slackWebhook string) *alarm.Alarm {
+	// build alarm
 	a := &alarm.Alarm{
 		Name: "Prod errors hourly",
 		Match: func(m *cmd.Msg) bool {
@@ -121,11 +153,12 @@ func prodErrorsHourly(slackWebhook string) *alarm.Alarm {
 			return true
 		},
 		Period:    time.Hour,
-		Threshold: 100,
+		Threshold: 1,
 	}
 	a.Action = func() error {
 		top5 := alarm.GenerateTopNView(a.Report, 5)
-		msg := fmt.Sprintf("We've had %d errors on prod in the last %s.\n\nTop 5 errors:\n%s",
+		msg := fmt.Sprintf("%s: We've had %d errors on prod in the last %s.\n\nTop 5 errors:\n%s",
+			a.Name,
 			a.EventCount.Load(),
 			jfmt.FmtDuration(a.Period),
 			top5)
@@ -147,15 +180,21 @@ func prodErrorsDaily(slackWebhook string) *alarm.Alarm {
 			}
 			return true
 		},
-		Period:    24 * time.Hour,
-		Threshold: 1,
+		Period:    time.Hour, // try to fire hourly
+		Threshold: 1,         // always send daily report when we have errors
 	}
+	// send error report between 09:00 and 09:59
 	a.Action = func() error {
-		top5 := alarm.GenerateTopNView(a.Report, 5)
-		msg := fmt.Sprintf("We've had %d errors on prod in the last %s.\n\nTop 5 errors:\n%s",
+		if time.Now().Hour() == 9 {
+			fmt.Println("skipped daily report, it's not 09:00")
+			return nil
+		}
+		top10 := alarm.GenerateTopNView(a.Report, 10)
+		msg := fmt.Sprintf("%s: We've had %d errors on prod in the last %s.\n\nTop 10 errors:\n%s",
+			a.Name,
 			a.EventCount.Load(),
 			jfmt.FmtDuration(a.Period),
-			top5)
+			top10)
 		fmt.Println(msg)
 		return alarm.SendSlackMsg(msg, slackWebhook)
 	}

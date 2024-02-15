@@ -17,6 +17,7 @@ type AlarmSvc struct {
 	In        chan *cmd.Msg // buffer doesn't help
 	triggered chan *Alarm   // buffer doesn't help
 	Alarms    sync.Map
+	started   time.Time
 }
 
 type Alarm struct {
@@ -42,13 +43,14 @@ func NewSvc() *AlarmSvc {
 	s := &AlarmSvc{
 		In:        make(chan *cmd.Msg, 100),
 		triggered: make(chan *Alarm),
+		started:   time.Now(),
 	}
 	// we need some gophers
 	// adding more gophers matching messages doesn't help
 	for i := 0; i < 4; i++ {
 		go s.matchMsgs()
 	}
-	go s.kickOldEvents()
+	go s.kickOldMatchedEvents()
 	go s.callActions()
 	return s
 }
@@ -78,6 +80,7 @@ func (svc *AlarmSvc) matchMsgs() {
 			})
 			al.EventCount.Add(1)
 			if al.EventCount.Load() >= al.Threshold {
+				// fire at most once per period
 				if al.LastTriggered.After(time.Now().Add(-al.Period)) {
 					return true
 				}
@@ -89,7 +92,7 @@ func (svc *AlarmSvc) matchMsgs() {
 	}
 }
 
-func (svc *AlarmSvc) kickOldEvents() {
+func (svc *AlarmSvc) kickOldMatchedEvents() {
 	for {
 		svc.Alarms.Range(func(key, value interface{}) bool {
 			al, ok := value.(*Alarm) // Type assertion
@@ -119,6 +122,11 @@ func (svc *AlarmSvc) callActions() {
 		fmt.Println("alarm triggered:", a.Name)
 		a.LastTriggered = time.Now()
 		a.createReport()
+		// prevent immediate firing
+		if time.Now().Before(svc.started.Add(a.Period)) {
+			fmt.Println("skipped action, app just started")
+			continue
+		}
 		err := a.Action()
 		if err != nil {
 			fmt.Println("alarm action err:", err)
