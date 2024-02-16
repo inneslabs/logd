@@ -127,9 +127,9 @@ func prodErrors10Min(slackWebhook string) *alarm.Alarm {
 	}
 	a.Action = func() error {
 		top5 := alarm.GenerateTopNView(a.Report, 5)
-		msg := fmt.Sprintf("%s: We've had %d errors on prod in the last %s.\n\nTop 5 errors:\n%s",
+		msg := fmt.Sprintf("%s: We've had %s errors on prod in the last %s.\n\nTop 5 errors:\n%s",
 			a.Name,
-			a.EventCount.Load(),
+			jfmt.FmtCount32(uint32(a.EventCount.Load())),
 			jfmt.FmtDuration(a.Period),
 			top5)
 		fmt.Println(msg)
@@ -157,9 +157,9 @@ func prodErrorsHourly(slackWebhook string) *alarm.Alarm {
 	}
 	a.Action = func() error {
 		top5 := alarm.GenerateTopNView(a.Report, 5)
-		msg := fmt.Sprintf("%s: We've had %d errors on prod in the last %s.\n\nTop 5 errors:\n%s",
+		msg := fmt.Sprintf("%s: We've had %s errors on prod in the last %s.\n\nTop 5 errors:\n%s",
 			a.Name,
-			a.EventCount.Load(),
+			jfmt.FmtCount32(uint32(a.EventCount.Load())),
 			jfmt.FmtDuration(a.Period),
 			top5)
 		fmt.Println(msg)
@@ -188,9 +188,9 @@ func prodErrorsDaily(slackWebhook string) *alarm.Alarm {
 	}
 	a.Action = func() error {
 		top10 := alarm.GenerateTopNView(a.Report, 10)
-		msg := fmt.Sprintf("%s: We've had %d errors on prod in the last %s.\n\nTop 10 errors:\n%s",
+		msg := fmt.Sprintf("%s: We've had %s errors on prod in the last %s.\n\nTop 10 errors:\n%s",
 			a.Name,
-			a.EventCount.Load(),
+			jfmt.FmtCount32(uint32(a.EventCount.Load())),
 			jfmt.FmtDuration(a.Period),
 			top10)
 		fmt.Println(msg)
