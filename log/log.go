@@ -37,7 +37,14 @@ type LoggerConfig struct {
 	Fn          string
 }
 
+// Returns a new logger, defaults to logd.swissinfo.ch:6102
 func NewLogger(cfg *LoggerConfig) (*Logger, error) {
+	if cfg.Host == "" {
+		cfg.Host = "logd.swissinfo.ch"
+	}
+	if cfg.Port == 0 {
+		cfg.Port = 6102
+	}
 	addrs, err := net.LookupHost(cfg.Host)
 	if err != nil {
 		return nil, err
@@ -71,4 +78,24 @@ func (l *Logger) Log(lvl *cmd.Lvl, template string, args ...interface{}) {
 	signedMsg, _ := auth.Sign(l.secret, payload, time.Now())
 	l.rateLimiter.Wait(l.ctx)
 	l.conn.Write(signedMsg)
+}
+
+func (l *Logger) Error(template string, args ...interface{}) {
+	l.Log(cmd.Lvl_ERROR.Enum(), template, args...)
+}
+
+func (l *Logger) Warn(template string, args ...interface{}) {
+	l.Log(cmd.Lvl_WARN.Enum(), template, args...)
+}
+
+func (l *Logger) Info(template string, args ...interface{}) {
+	l.Log(cmd.Lvl_INFO.Enum(), template, args...)
+}
+
+func (l *Logger) Debug(template string, args ...interface{}) {
+	l.Log(cmd.Lvl_DEBUG.Enum(), template, args...)
+}
+
+func (l *Logger) Trace(template string, args ...interface{}) {
+	l.Log(cmd.Lvl_TRACE.Enum(), template, args...)
 }
