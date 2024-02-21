@@ -59,7 +59,7 @@ func (app *App) measureStatus() {
 	for {
 		select {
 		case <-time.After(time.Second):
-			currentWrites := app.buf.Writes.Load()
+			currentWrites := app.buf.NumWrites()
 			delta := currentWrites - lastWrites
 			timeDelta := time.Since(lastTime).Seconds()
 			writePerSec := uint64(float64(delta) / timeDelta)

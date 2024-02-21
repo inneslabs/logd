@@ -8,10 +8,10 @@ import (
 )
 
 type RingBuffer struct {
-	head   atomic.Uint32
-	size   uint32
-	values [][]byte
-	Writes atomic.Uint64
+	head      atomic.Uint32
+	size      uint32
+	values    [][]byte
+	numWrites atomic.Uint64
 }
 
 // NewRingBuffer returns a pointer to a new RingBuffer of given size
@@ -27,10 +27,14 @@ func (b *RingBuffer) Size() uint32 {
 	return b.size
 }
 
+func (b *RingBuffer) NumWrites() uint64 {
+	return b.numWrites.Load()
+}
+
 // Write writes the data to buffer at position of head,
 // head is then atomically incremented
 func (b *RingBuffer) Write(data []byte) {
-	b.Writes.Add(uint64(1))
+	b.numWrites.Add(uint64(1))
 	head := b.head.Load()
 	b.values[head] = data
 	b.head.Store((head + 1) % b.size)
