@@ -25,6 +25,7 @@ type Logger struct {
 	env         string
 	svc         string
 	fn          string
+	stdout      bool
 }
 
 type LoggerConfig struct {
@@ -35,6 +36,7 @@ type LoggerConfig struct {
 	Env         string
 	Svc         string
 	Fn          string
+	Stdout      bool
 }
 
 // Returns a new logger, defaults to logd.swissinfo.ch:6102
@@ -78,6 +80,9 @@ func (l *Logger) Log(lvl *cmd.Lvl, template string, args ...interface{}) {
 	signedMsg, _ := auth.Sign(l.secret, payload, time.Now())
 	l.rateLimiter.Wait(l.ctx)
 	l.conn.Write(signedMsg)
+	if l.stdout {
+		fmt.Printf(template, args...)
+	}
 }
 
 func (l *Logger) Error(template string, args ...interface{}) {
