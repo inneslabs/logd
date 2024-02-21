@@ -63,6 +63,7 @@ func NewLogger(cfg *LoggerConfig) (*Logger, error) {
 		env:         cfg.Env,
 		svc:         cfg.Svc,
 		fn:          cfg.Fn,
+		stdout:      cfg.Stdout,
 	}, nil
 }
 
