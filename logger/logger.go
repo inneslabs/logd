@@ -82,7 +82,7 @@ func (l *Logger) Log(lvl *cmd.Lvl, template string, args ...interface{}) {
 	l.rateLimiter.Wait(l.ctx)
 	l.conn.Write(signedMsg)
 	if l.stdout {
-		fmt.Printf(template, args...)
+		fmt.Printf(template+"\n", args...)
 	}
 }
 
