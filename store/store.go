@@ -45,7 +45,7 @@ func (s *Store) Heads() map[string]uint32 {
 	for key, ring := range s.rings {
 		heads[key] = ring.Head()
 	}
-	heads["/fallback"] = s.fallback.Head()
+	heads["_fallback"] = s.fallback.Head()
 	return heads
 }
 
@@ -54,7 +54,7 @@ func (s *Store) Sizes() map[string]uint32 {
 	for key, ring := range s.rings {
 		sizes[key] = ring.Size()
 	}
-	sizes["/fallback"] = s.fallback.Size()
+	sizes["_fallback"] = s.fallback.Size()
 	return sizes
 }
 
