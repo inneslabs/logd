@@ -23,14 +23,19 @@ func (svc *UdpSvc) handleWrite(c *cmd.Cmd, unpk *auth.Unpacked) error {
 	if err != nil {
 		return fmt.Errorf("protobuf marshal msg err: %w", err)
 	}
-	// write to buffer
-	svc.ringBuf.Write(msgBytes)
-	// pipe to tails
+	// write to store
+	key := fmt.Sprintf("%s/%s", c.Msg.GetEnv(), c.Msg.GetSvc())
+	svc.logStore.Write(key, msgBytes)
+	// send to tails
 	svc.forSubs <- &ProtoPair{
 		Msg:   c.Msg,
 		Bytes: msgBytes,
 	}
-	// pipe to alarm svc
-	svc.alarmSvc.In <- c.Msg
+	// send prod errors to alarm svc
+	if c.Msg.GetEnv() == "prod" {
+		if c.Msg.GetLvl() == cmd.Lvl_ERROR || c.Msg.GetLvl() == cmd.Lvl_FATAL {
+			svc.alarmSvc.In <- c.Msg
+		}
+	}
 	return nil
 }

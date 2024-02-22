@@ -22,8 +22,7 @@ type AlarmSvc struct {
 
 type Alarm struct {
 	Name      string
-	Match     func(*cmd.Msg) bool
-	Recent    *ring.RingBuffer
+	Recent    *ring.Ring
 	Period    time.Duration // period of analysis
 	Threshold int32
 	// using sync.Map for better concurrent access
@@ -68,10 +67,6 @@ func (svc *AlarmSvc) matchMsgs() {
 			// Type assertion
 			al, ok := value.(*Alarm)
 			if !ok {
-				return true // continue iteration
-			}
-			// Use alarm's match function
-			if !al.Match(msg) {
 				return true // continue iteration
 			}
 			al.Events.Store(t, &Event{

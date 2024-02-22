@@ -7,41 +7,35 @@ import (
 	"sync/atomic"
 )
 
-type RingBuffer struct {
-	head      atomic.Uint32
-	size      uint32
-	values    [][]byte
-	numWrites atomic.Uint64
+type Ring struct {
+	head   atomic.Uint32
+	size   uint32
+	values [][]byte
 }
 
 // NewRingBuffer returns a pointer to a new RingBuffer of given size
-func NewRingBuffer(size uint32) *RingBuffer {
-	r := &RingBuffer{
+func NewRing(size uint32) *Ring {
+	r := &Ring{
 		size:   size,
 		values: make([][]byte, size),
 	}
 	return r
 }
 
-func (b *RingBuffer) Size() uint32 {
+func (b *Ring) Size() uint32 {
 	return b.size
-}
-
-func (b *RingBuffer) NumWrites() uint64 {
-	return b.numWrites.Load()
 }
 
 // Write writes the data to buffer at position of head,
 // head is then atomically incremented
-func (b *RingBuffer) Write(data []byte) {
-	b.numWrites.Add(uint64(1))
+func (b *Ring) Write(data []byte) {
 	head := b.head.Load()
 	b.values[head] = data
 	b.head.Store((head + 1) % b.size)
 }
 
 // Read returns limit of data
-func (b *RingBuffer) Read(offset, limit uint32) [][]byte {
+func (b *Ring) Read(offset, limit uint32) [][]byte {
 	if limit > b.size {
 		limit = b.size
 	}
@@ -63,11 +57,11 @@ func (b *RingBuffer) Read(offset, limit uint32) [][]byte {
 	return output
 }
 
-func (b *RingBuffer) Head() uint32 {
+func (b *Ring) Head() uint32 {
 	return b.head.Load()
 }
 
 // Returns the record {index} slots ahead of head (oldest first)
-func (b *RingBuffer) ReadOne(index uint32) []byte {
+func (b *Ring) ReadOne(index uint32) []byte {
 	return b.values[index%b.size]
 }

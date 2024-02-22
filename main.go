@@ -15,8 +15,7 @@ import (
 	"github.com/intob/jfmt"
 	"github.com/swissinfo-ch/logd/alarm"
 	"github.com/swissinfo-ch/logd/app"
-	"github.com/swissinfo-ch/logd/cmd"
-	"github.com/swissinfo-ch/logd/ring"
+	"github.com/swissinfo-ch/logd/store"
 	"github.com/swissinfo-ch/logd/udp"
 )
 
@@ -66,14 +65,24 @@ func main() {
 	fmt.Println("buffer size set to", bufferSize)
 	fmt.Println("access-control-allow-origin set to", accessControlAllowOrigin)
 
-	// init ring buffer
-	ringBuf := ring.NewRingBuffer(uint32(bufferSize))
+	// init store
+	svcSize := uint32(100000) // 100K logs per env/svc
+	logStore := store.NewStore(&store.Cfg{
+		RingSizes: map[string]uint32{
+			"/prod/taxonomy-service": svcSize,
+			"/prod/ticker-service":   svcSize,
+			"/prod/logs":             svcSize,
+			"/prod/swiplus-service":  svcSize,
+			"/prod/video-service":    svcSize,
+			"/prod/swi-core":         1000,
+		},
+		FallbackSize: 500000, // 500K as fallback
+	})
 
 	// init alarms
 	alarmSvc := alarm.NewSvc()
 	alarmSvc.Set(prodErrors10Min(slackWebhook))
 	alarmSvc.Set(prodErrorsHourly(slackWebhook))
-	alarmSvc.Set(prodErrorsDaily(slackWebhook))
 
 	// init root context
 	ctx := getCtx()
@@ -84,7 +93,7 @@ func main() {
 		LaddrPort:           udpLaddrPort,
 		ReadSecret:          readSecret,
 		WriteSecret:         writeSecret,
-		RingBuf:             ringBuf,
+		LogStore:            logStore,
 		AlarmSvc:            alarmSvc,
 		SubRateLimitEvery:   100 * time.Microsecond,
 		SubRateLimitBurst:   50,
@@ -95,7 +104,7 @@ func main() {
 	// init app
 	app.NewApp(&app.Cfg{
 		Ctx:                      ctx,
-		Buf:                      ringBuf,
+		LogStore:                 logStore,
 		AlarmSvc:                 alarmSvc,
 		RateLimitEvery:           time.Second,
 		RateLimitBurst:           10,
@@ -112,16 +121,7 @@ func main() {
 func prodErrors10Min(slackWebhook string) *alarm.Alarm {
 	// build alarm
 	a := &alarm.Alarm{
-		Name: "10K prod errors in 10 minutes",
-		Match: func(m *cmd.Msg) bool {
-			if m.GetLvl() != cmd.Lvl_ERROR {
-				return false
-			}
-			if m.GetEnv() != "prod" {
-				return false
-			}
-			return true
-		},
+		Name:      "10K prod errors in 10 minutes",
 		Period:    10 * time.Minute,
 		Threshold: 10000,
 	}
@@ -142,16 +142,7 @@ func prodErrors10Min(slackWebhook string) *alarm.Alarm {
 func prodErrorsHourly(slackWebhook string) *alarm.Alarm {
 	// build alarm
 	a := &alarm.Alarm{
-		Name: "Prod errors hourly",
-		Match: func(m *cmd.Msg) bool {
-			if m.GetLvl() != cmd.Lvl_ERROR {
-				return false
-			}
-			if m.GetEnv() != "prod" {
-				return false
-			}
-			return true
-		},
+		Name:      "Prod errors hourly",
 		Period:    time.Hour,
 		Threshold: 1,
 	}
@@ -162,37 +153,6 @@ func prodErrorsHourly(slackWebhook string) *alarm.Alarm {
 			jfmt.FmtCount32(uint32(a.EventCount.Load())),
 			jfmt.FmtDuration(a.Period),
 			top5)
-		fmt.Println(msg)
-		return alarm.SendSlackMsg(msg, slackWebhook)
-	}
-	return a
-}
-
-// prodErrorsDaily returns an alarm that triggers on prod errors daily
-// TODO: make a cleaner way of sending daily or hourly reports,
-// other than period & threshold based
-func prodErrorsDaily(slackWebhook string) *alarm.Alarm {
-	a := &alarm.Alarm{
-		Name: "Prod errors daily",
-		Match: func(m *cmd.Msg) bool {
-			if m.GetLvl() != cmd.Lvl_ERROR {
-				return false
-			}
-			if m.GetEnv() != "prod" {
-				return false
-			}
-			return true
-		},
-		Period:    24 * time.Hour,
-		Threshold: 1, // always send daily report when we have errors
-	}
-	a.Action = func() error {
-		top10 := alarm.GenerateTopNView(a.Report, 10)
-		msg := fmt.Sprintf("%s: We've had %s errors on prod in the last %s.\n\nTop 10 errors:\n%s",
-			a.Name,
-			jfmt.FmtCount32(uint32(a.EventCount.Load())),
-			jfmt.FmtDuration(a.Period),
-			top10)
 		fmt.Println(msg)
 		return alarm.SendSlackMsg(msg, slackWebhook)
 	}

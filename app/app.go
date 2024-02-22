@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/swissinfo-ch/logd/alarm"
-	"github.com/swissinfo-ch/logd/ring"
+	"github.com/swissinfo-ch/logd/store"
 	"golang.org/x/time/rate"
 )
 
@@ -20,7 +20,7 @@ type App struct {
 	// cfg
 	ctx                      context.Context
 	port                     int
-	buf                      *ring.RingBuffer
+	logStore                 *store.Store
 	alarmSvc                 *alarm.AlarmSvc
 	rateLimitEvery           time.Duration
 	rateLimitBurst           int
@@ -36,7 +36,7 @@ type App struct {
 type Cfg struct {
 	Ctx                      context.Context
 	Port                     int
-	Buf                      *ring.RingBuffer
+	LogStore                 *store.Store
 	AlarmSvc                 *alarm.AlarmSvc
 	RateLimitEvery           time.Duration
 	RateLimitBurst           int
@@ -58,7 +58,7 @@ func NewApp(cfg *Cfg) *App {
 		// cfg
 		ctx:                      cfg.Ctx,
 		port:                     cfg.Port,
-		buf:                      cfg.Buf,
+		logStore:                 cfg.LogStore,
 		alarmSvc:                 cfg.AlarmSvc,
 		rateLimitEvery:           cfg.RateLimitEvery,
 		rateLimitBurst:           cfg.RateLimitBurst,

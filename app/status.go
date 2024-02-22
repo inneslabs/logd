@@ -20,7 +20,7 @@ type Status struct {
 	Commit  string         `json:"commit"`
 	Uptime  string         `json:"uptime"`
 	Machine *MachineInfo   `json:"machine"`
-	Buffer  *BufferInfo    `json:"buffer"`
+	Store   *StoreInfo     `json:"store"`
 	Alarms  []*AlarmStatus `json:"alarms"`
 }
 
@@ -28,7 +28,7 @@ type MachineInfo struct {
 	NumCpu int `json:"numCpu"`
 }
 
-type BufferInfo struct {
+type StoreInfo struct {
 	Writes         uint64 `json:"writes"`
 	Size           uint32 `json:"size"`
 	MaxWritePerSec uint64 `json:"maxWritePerSec"`
@@ -51,7 +51,6 @@ func (app *App) handleStatus(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) measureStatus() {
 	numCpu := runtime.NumCPU()
-	bufSize := app.buf.Size()
 	lastWrites := uint64(0)
 	lastTime := time.Now()
 	maxWritePerSec := uint64(0)
@@ -59,7 +58,7 @@ func (app *App) measureStatus() {
 	for {
 		select {
 		case <-time.After(time.Second):
-			currentWrites := app.buf.NumWrites()
+			currentWrites := app.logStore.NumWrites()
 			delta := currentWrites - lastWrites
 			timeDelta := time.Since(lastTime).Seconds()
 			writePerSec := uint64(float64(delta) / timeDelta)
@@ -85,9 +84,8 @@ func (app *App) measureStatus() {
 				Machine: &MachineInfo{
 					NumCpu: numCpu,
 				},
-				Buffer: &BufferInfo{
+				Store: &StoreInfo{
 					Writes:         currentWrites,
-					Size:           bufSize,
 					MaxWritePerSec: maxWritePerSec,
 				},
 				Alarms: make([]*AlarmStatus, 0, len(alarms)),

@@ -1,7 +1,6 @@
 package udp
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/netip"
@@ -15,87 +14,94 @@ import (
 
 const hardLimit = 1000
 
-func (svc *UdpSvc) handleQuery(c *cmd.Cmd, raddr netip.AddrPort, unpk *auth.Unpacked) error {
-	valid, err := auth.Verify(svc.readSecret, unpk)
+func (udpSvc *UdpSvc) handleQuery(query *cmd.Cmd, raddr netip.AddrPort, unpk *auth.Unpacked) error {
+	valid, err := auth.Verify(udpSvc.readSecret, unpk)
 	if !valid || err != nil {
 		return errors.New("unauthorized")
 	}
-	svc.queryRateLimiter.Wait(context.Background())
-	offset := c.GetQueryParams().GetOffset()
-	limit := limit(c.GetQueryParams().GetLimit())
-	tStart := tStart(c.GetQueryParams())
-	tEnd := tEnd(c.GetQueryParams())
-	env := c.GetQueryParams().GetEnv()
-	cmdSvc := c.GetQueryParams().GetSvc()
-	fn := c.GetQueryParams().GetFn()
-	lvl := c.GetQueryParams().GetLvl()
-	txt := c.GetQueryParams().GetTxt()
-	httpMethod := c.GetQueryParams().GetHttpMethod()
-	url := c.GetQueryParams().GetUrl()
-	responseStatus := c.GetQueryParams().GetResponseStatus()
-	max := svc.ringBuf.Size()
-	var found uint32
-	head := svc.ringBuf.Head()
-	for offset < max && found < limit {
-		offset++
-		payload := svc.ringBuf.ReadOne((head - offset) % max)
-		if payload == nil {
-			break // reached end of items in non-full buffer
-		}
+
+	udpSvc.queryRateLimiter.Wait(udpSvc.ctx)
+
+	offset := query.GetQueryParams().GetOffset()
+	limit := limit(query.GetQueryParams().GetLimit())
+	env := query.GetQueryParams().GetEnv()
+	svc := query.GetQueryParams().GetSvc()
+
+	keyPrefix := fmt.Sprintf("%s/%s", env, svc)
+
+	logs := udpSvc.logStore.Read(keyPrefix, offset, limit)
+
+	for log := range logs {
 		msg := &cmd.Msg{}
-		err = proto.Unmarshal(payload, msg)
+		err = proto.Unmarshal(log, msg)
 		if err != nil {
 			fmt.Println("query unmarshal protobuf err:", err)
-			continue
-		}
-		msgT := msg.T.AsTime()
-		if tStart != nil && msgT.Before(*tStart) {
-			continue
-		}
-		if tEnd != nil && msgT.After(*tEnd) {
-			continue
-		}
-		if env != "" && env != msg.GetEnv() {
-			continue
-		}
-		if cmdSvc != "" && cmdSvc != msg.GetSvc() {
-			continue
-		}
-		if fn != "" && fn != msg.GetFn() {
-			continue
-		}
-		if lvl != cmd.Lvl_LVL_UNKNOWN && lvl != msg.GetLvl() {
-			continue
-		}
-		msgTxt := msg.GetTxt()
-		if txt != "" && !strings.Contains(strings.ToLower(msgTxt), strings.ToLower(txt)) {
-			continue
-		}
-		msgHttpMethod := msg.GetHttpMethod()
-		if httpMethod != cmd.HttpMethod_METHOD_UNKNOWN && httpMethod != msgHttpMethod {
-			continue
-		}
-		msgUrl := msg.GetUrl()
-		if url != "" && !strings.HasPrefix(msgUrl, url) {
-			continue
-		}
-		msgResponseStatus := msg.GetResponseStatus()
-		if responseStatus != 0 && responseStatus != msgResponseStatus {
-			continue
-		}
-		err := svc.subRateLimiter.Wait(context.TODO())
-		if err != nil {
 			return err
 		}
-		_, err = svc.conn.WriteToUDPAddrPort(payload, raddr)
-		if err != nil {
-			return err
+		if matchMsg(msg, query) {
+			err := udpSvc.subRateLimiter.Wait(udpSvc.ctx)
+			if err != nil {
+				return err
+			}
+			_, err = udpSvc.conn.WriteToUDPAddrPort(log, raddr)
+			if err != nil {
+				return err
+			}
 		}
-		found++
 	}
+
 	time.Sleep(time.Millisecond * 50) // ensure +END arrives last
-	svc.reply("+END", raddr)
+	udpSvc.reply("+END", raddr)
 	return nil
+}
+
+func matchMsg(msg *cmd.Msg, query *cmd.Cmd) bool {
+	env := query.GetQueryParams().GetEnv()
+	svc := query.GetQueryParams().GetSvc()
+	tStart := tStart(query.GetQueryParams())
+	tEnd := tEnd(query.GetQueryParams())
+	fn := query.GetQueryParams().GetFn()
+	lvl := query.GetQueryParams().GetLvl()
+	txt := query.GetQueryParams().GetTxt()
+	httpMethod := query.GetQueryParams().GetHttpMethod()
+	url := query.GetQueryParams().GetUrl()
+	responseStatus := query.GetQueryParams().GetResponseStatus()
+	msgT := msg.T.AsTime()
+	if tStart != nil && msgT.Before(*tStart) {
+		return false
+	}
+	if tEnd != nil && msgT.After(*tEnd) {
+		return false
+	}
+	if env != "" && env != msg.GetEnv() {
+		return false
+	}
+	if svc != "" && svc != msg.GetSvc() {
+		return false
+	}
+	if fn != "" && fn != msg.GetFn() {
+		return false
+	}
+	if lvl != cmd.Lvl_LVL_UNKNOWN && lvl != msg.GetLvl() {
+		return false
+	}
+	msgTxt := msg.GetTxt()
+	if txt != "" && !strings.Contains(strings.ToLower(msgTxt), strings.ToLower(txt)) {
+		return false
+	}
+	msgHttpMethod := msg.GetHttpMethod()
+	if httpMethod != cmd.HttpMethod_METHOD_UNKNOWN && httpMethod != msgHttpMethod {
+		return false
+	}
+	msgUrl := msg.GetUrl()
+	if url != "" && !strings.HasPrefix(msgUrl, url) {
+		return false
+	}
+	msgResponseStatus := msg.GetResponseStatus()
+	if responseStatus != 0 && responseStatus != msgResponseStatus {
+		return false
+	}
+	return true
 }
 
 func limit(qLimit uint32) uint32 {

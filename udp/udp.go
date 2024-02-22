@@ -15,7 +15,7 @@ import (
 	"github.com/swissinfo-ch/logd/alarm"
 	"github.com/swissinfo-ch/logd/auth"
 	"github.com/swissinfo-ch/logd/cmd"
-	"github.com/swissinfo-ch/logd/ring"
+	"github.com/swissinfo-ch/logd/store"
 	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
 )
@@ -33,7 +33,7 @@ type UdpSvc struct {
 	queryRateLimiter *rate.Limiter
 	readSecret       []byte
 	writeSecret      []byte
-	ringBuf          *ring.RingBuffer
+	logStore         *store.Store
 	unpkPool         *sync.Pool
 	alarmSvc         *alarm.AlarmSvc
 }
@@ -43,7 +43,7 @@ type Cfg struct {
 	LaddrPort           string
 	ReadSecret          string
 	WriteSecret         string
-	RingBuf             *ring.RingBuffer
+	LogStore            *store.Store
 	AlarmSvc            *alarm.AlarmSvc
 	SubRateLimitEvery   time.Duration
 	SubRateLimitBurst   int
@@ -79,7 +79,7 @@ func NewSvc(cfg *Cfg) *UdpSvc {
 		queryRateLimiter: rate.NewLimiter(rate.Every(cfg.QueryRateLimitEvery), cfg.QueryRateLimitBurst),
 		readSecret:       []byte(cfg.ReadSecret),
 		writeSecret:      []byte(cfg.WriteSecret),
-		ringBuf:          cfg.RingBuf,
+		logStore:         cfg.LogStore,
 		alarmSvc:         cfg.AlarmSvc,
 		unpkPool: &sync.Pool{
 			New: func() any {

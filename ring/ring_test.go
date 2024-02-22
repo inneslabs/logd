@@ -11,7 +11,7 @@ import (
 )
 
 func TestReadWhenEmpty(t *testing.T) {
-	r := NewRingBuffer(5)
+	r := NewRing(5)
 	n := len(r.Read(0, 6))
 	if n > 0 {
 		t.Fatalf("expected 0, got %d", n)
@@ -38,7 +38,7 @@ func TestOffset(t *testing.T) {
 }
 
 func testWriteAndReadWithOffset(size, nWrites, offset int) bool {
-	r := NewRingBuffer(uint32(size))
+	r := NewRing(uint32(size))
 	writes := make([][]byte, 0)
 	for i := 0; i < nWrites; i++ {
 		buf := make([]byte, 32)
@@ -60,7 +60,7 @@ func testWriteAndReadWithOffset(size, nWrites, offset int) bool {
 }
 
 func testWriteAndRead(size, nWrites int) bool {
-	r := NewRingBuffer(uint32(size))
+	r := NewRing(uint32(size))
 	writes := make([][]byte, 0)
 	for i := 0; i < nWrites; i++ {
 		buf := make([]byte, 32)
@@ -83,7 +83,7 @@ func testWriteAndRead(size, nWrites int) bool {
 
 // BenchmarkWriteRingBuffer tests the performance of writing to the RingBuffer
 func BenchmarkWriteRingBuffer(b *testing.B) {
-	buffer := NewRingBuffer(1024) // Adjust size as needed
+	buffer := NewRing(1024)       // Adjust size as needed
 	data := []byte("sample data") // Sample data to write
 
 	b.ResetTimer()
@@ -95,7 +95,7 @@ func BenchmarkWriteRingBuffer(b *testing.B) {
 // BenchmarkReadRingBuffer tests the performance of reading from the RingBuffer
 func BenchmarkReadRingBuffer(b *testing.B) {
 	size := uint32(4096)
-	buf := NewRingBuffer(size)
+	buf := NewRing(size)
 	for i := uint32(0); i < size; i++ {
 		data := []byte(fmt.Sprintf("sample data %d", i))
 		buf.Write(data)
