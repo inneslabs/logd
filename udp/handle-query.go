@@ -27,7 +27,7 @@ func (udpSvc *UdpSvc) handleQuery(query *cmd.Cmd, raddr netip.AddrPort, unpk *au
 	env := query.GetQueryParams().GetEnv()
 	svc := query.GetQueryParams().GetSvc()
 
-	keyPrefix := fmt.Sprintf("%s/%s", env, svc)
+	keyPrefix := fmt.Sprintf("/%s/%s", env, svc)
 
 	logs := udpSvc.logStore.Read(keyPrefix, offset, limit)
 
