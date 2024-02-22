@@ -42,18 +42,20 @@ func (s *Store) Write(key string, data []byte) {
 }
 
 func (s *Store) Heads() map[string]uint32 {
-	heads := make(map[string]uint32, len(s.rings))
+	heads := make(map[string]uint32, len(s.rings)+1)
 	for key, ring := range s.rings {
 		heads[key] = ring.Head()
 	}
+	heads["_fallback"] = s.fallback.Head()
 	return heads
 }
 
 func (s *Store) Sizes() map[string]uint32 {
-	sizes := make(map[string]uint32, len(s.rings))
+	sizes := make(map[string]uint32, len(s.rings)+1)
 	for key, ring := range s.rings {
 		sizes[key] = ring.Size()
 	}
+	sizes["_fallback"] = s.fallback.Size()
 	return sizes
 }
 
