@@ -1,7 +1,6 @@
 package store
 
 import (
-	"fmt"
 	"strings"
 	"sync/atomic"
 
@@ -35,11 +34,9 @@ func (s *Store) Write(key string, data []byte) {
 	s.numWrites.Add(uint64(1))
 	part := s.rings[key]
 	if part == nil {
-		fmt.Println("fallback", key)
 		s.fallback.Write(data)
 		return
 	}
-	fmt.Println("part", key)
 	part.Write(data)
 }
 
