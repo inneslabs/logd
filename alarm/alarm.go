@@ -14,7 +14,7 @@ import (
 )
 
 type AlarmSvc struct {
-	In        chan *cmd.Msg // buffer doesn't help
+	in        chan *cmd.Msg // buffer doesn't help
 	triggered chan *Alarm   // buffer doesn't help
 	Alarms    sync.Map
 	started   time.Time
@@ -40,15 +40,12 @@ type Event struct {
 
 func NewSvc() *AlarmSvc {
 	s := &AlarmSvc{
-		In:        make(chan *cmd.Msg, 100),
+		in:        make(chan *cmd.Msg, 100),
 		triggered: make(chan *Alarm),
 		started:   time.Now(),
 	}
 	// we need some gophers
-	// adding more gophers matching messages doesn't help
-	for i := 0; i < 4; i++ {
-		go s.matchMsgs()
-	}
+	go s.matchMsgs()
 	go s.kickOldMatchedEvents()
 	go s.callActions()
 	return s
@@ -59,9 +56,13 @@ func (svc *AlarmSvc) Set(al *Alarm) {
 	fmt.Println("set alarm:", al.Name)
 }
 
+func (svc *AlarmSvc) Put(msg *cmd.Msg) {
+	svc.in <- msg
+}
+
 func (svc *AlarmSvc) matchMsgs() {
 	fmt.Println("alarm-matching gopher started")
-	for msg := range svc.In {
+	for msg := range svc.in {
 		t := msg.T.AsTime().UnixMicro()
 		svc.Alarms.Range(func(key, value interface{}) bool {
 			// Type assertion

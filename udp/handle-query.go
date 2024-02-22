@@ -27,11 +27,15 @@ func (udpSvc *UdpSvc) handleQuery(query *cmd.Cmd, raddr netip.AddrPort, unpk *au
 	env := query.GetQueryParams().GetEnv()
 	svc := query.GetQueryParams().GetSvc()
 
-	keyPrefix := fmt.Sprintf("/%s/%s", env, svc)
+	keyPrefix := "/"
+	if env != "" {
+		keyPrefix += env
+		if svc != "" {
+			keyPrefix += svc
+		}
+	}
 
-	logs := udpSvc.logStore.Read(keyPrefix, offset, limit)
-
-	for log := range logs {
+	for log := range udpSvc.logStore.Read(keyPrefix, offset, limit) {
 		msg := &cmd.Msg{}
 		err = proto.Unmarshal(log, msg)
 		if err != nil {
@@ -56,8 +60,6 @@ func (udpSvc *UdpSvc) handleQuery(query *cmd.Cmd, raddr netip.AddrPort, unpk *au
 }
 
 func matchMsg(msg *cmd.Msg, query *cmd.Cmd) bool {
-	env := query.GetQueryParams().GetEnv()
-	svc := query.GetQueryParams().GetSvc()
 	tStart := tStart(query.GetQueryParams())
 	tEnd := tEnd(query.GetQueryParams())
 	fn := query.GetQueryParams().GetFn()
@@ -71,12 +73,6 @@ func matchMsg(msg *cmd.Msg, query *cmd.Cmd) bool {
 		return false
 	}
 	if tEnd != nil && msgT.After(*tEnd) {
-		return false
-	}
-	if env != "" && env != msg.GetEnv() {
-		return false
-	}
-	if svc != "" && svc != msg.GetSvc() {
 		return false
 	}
 	if fn != "" && fn != msg.GetFn() {

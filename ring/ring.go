@@ -34,27 +34,47 @@ func (b *Ring) Write(data []byte) {
 	b.head.Store((head + 1) % b.size)
 }
 
-// Read returns limit of data
-func (b *Ring) Read(offset, limit uint32) [][]byte {
-	if limit > b.size {
-		limit = b.size
-	}
-	// pre-allocating the output slice is 2x faster
-	output := make([][]byte, 0, limit)
-	reads := uint32(0)
-	head := b.head.Load()
-	index := (head + (b.size - 1) + offset) % b.size
-	for reads < limit {
-		if b.values[index] != nil {
-			output = append(output, b.values[index])
+func (b *Ring) Read(offset, limit uint32) <-chan []byte {
+	ch := make(chan []byte, limit) // Buffered channel with size 'limit'
+
+	go func() {
+		defer close(ch) // Ensure channel is closed when operation completes
+
+		if limit > b.size {
+			limit = b.size
 		}
-		if index == 0 {
-			index = b.size
+		reads := uint32(0)
+		head := b.head.Load()
+
+		var index uint32
+		// Calculate start index based on offset, ensuring it wraps correctly
+		if head < offset {
+			index = b.size - (offset - head)
+		} else {
+			index = head - offset
 		}
-		index--
-		reads++
-	}
-	return output
+
+		// Adjust if we're starting beyond the most recent write
+		if index == b.size {
+			index = 0
+		}
+
+		// Loop to send data through the channel
+		for reads < limit {
+			// Calculate the correct index to read from, wrapping around if necessary
+			readIndex := (index + reads) % b.size
+			if b.values[readIndex] != nil {
+				ch <- b.values[readIndex]
+			}
+			reads++
+			// Stop if we've looped back to the head
+			if reads >= limit || readIndex == head {
+				break
+			}
+		}
+	}()
+
+	return ch
 }
 
 func (b *Ring) Head() uint32 {

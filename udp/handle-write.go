@@ -34,7 +34,7 @@ func (svc *UdpSvc) handleWrite(c *cmd.Cmd, unpk *auth.Unpacked) error {
 	// send prod errors to alarm svc
 	if c.Msg.GetEnv() == "prod" {
 		if c.Msg.GetLvl() == cmd.Lvl_ERROR || c.Msg.GetLvl() == cmd.Lvl_FATAL {
-			svc.alarmSvc.In <- c.Msg
+			svc.alarmSvc.Put(c.Msg)
 		}
 	}
 	return nil

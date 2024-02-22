@@ -29,9 +29,14 @@ type MachineInfo struct {
 }
 
 type StoreInfo struct {
-	Writes         uint64 `json:"writes"`
-	Size           uint32 `json:"size"`
-	MaxWritePerSec uint64 `json:"maxWritePerSec"`
+	Writes         uint64               `json:"writes"`
+	Rings          map[string]*RingInfo `json:"rings"`
+	MaxWritePerSec uint64               `json:"maxWritePerSec"`
+}
+
+type RingInfo struct {
+	Head uint32 `json:"head"`
+	Size uint32 `json:"size"`
 }
 
 type AlarmStatus struct {
@@ -58,16 +63,17 @@ func (app *App) measureStatus() {
 	for {
 		select {
 		case <-time.After(time.Second):
-			currentWrites := app.logStore.NumWrites()
-			delta := currentWrites - lastWrites
+			writes := app.logStore.NumWrites()
+			delta := writes - lastWrites
 			timeDelta := time.Since(lastTime).Seconds()
 			writePerSec := uint64(float64(delta) / timeDelta)
 			if writePerSec > maxWritePerSec {
 				maxWritePerSec = writePerSec
 			}
-			lastWrites = currentWrites
+			lastWrites = writes
 			lastTime = time.Now()
 
+			// build alarm report
 			alarms := make([]*alarm.Alarm, 0, 10)
 			app.alarmSvc.Alarms.Range(func(key, value any) bool {
 				al, ok := value.(*alarm.Alarm)
@@ -78,6 +84,17 @@ func (app *App) measureStatus() {
 				return true
 			})
 
+			// build log store rings report
+			heads := app.logStore.Heads()
+			sizes := app.logStore.Sizes()
+			rings := make(map[string]*RingInfo, len(heads))
+			for key := range heads {
+				rings[key] = &RingInfo{
+					Head: heads[key],
+					Size: sizes[key],
+				}
+			}
+
 			info := &Status{
 				Commit: app.commit,
 				Uptime: jfmt.FmtDuration(time.Since(app.started)),
@@ -85,7 +102,8 @@ func (app *App) measureStatus() {
 					NumCpu: numCpu,
 				},
 				Store: &StoreInfo{
-					Writes:         currentWrites,
+					Writes:         writes,
+					Rings:          rings,
 					MaxWritePerSec: maxWritePerSec,
 				},
 				Alarms: make([]*AlarmStatus, 0, len(alarms)),

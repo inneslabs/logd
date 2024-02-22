@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"strings"
 	"sync/atomic"
 
@@ -40,47 +41,64 @@ func (s *Store) Write(key string, data []byte) {
 	part.Write(data)
 }
 
+func (s *Store) Heads() map[string]uint32 {
+	heads := make(map[string]uint32, len(s.rings))
+	for key, ring := range s.rings {
+		heads[key] = ring.Head()
+	}
+	return heads
+}
+
+func (s *Store) Sizes() map[string]uint32 {
+	sizes := make(map[string]uint32, len(s.rings))
+	for key, ring := range s.rings {
+		sizes[key] = ring.Size()
+	}
+	return sizes
+}
+
 // Read reads up to limit items, from offset,
 // all rings with the given key prefix
 func (s *Store) Read(keyPrefix string, offset, limit uint32) <-chan []byte {
+	fmt.Println("store.Read()", keyPrefix, offset, limit)
 	out := make(chan []byte)
 	go func() {
+		defer close(out)
 		// try to read from exact ring
 		exactRing := s.rings[keyPrefix]
 		if exactRing != nil {
-			readRing(exactRing, offset, limit, out)
-			close(out)
+			fmt.Println("exact match", keyPrefix)
+			for d := range exactRing.Read(offset, limit) {
+				out <- d
+			}
 			return
 		}
-		// fallback to prefix, ranging through rings
 		var count uint32
+		// ranging through rings for prefix
 		for key, r := range s.rings {
 			if strings.HasPrefix(key, keyPrefix) {
-				count += readRing(r, offset, limit-count, out)
-				if count >= limit {
-					close(out)
-					return
+				fmt.Println(keyPrefix, "matched", key)
+				for d := range r.Read(offset, limit-count) {
+					out <- d
+					count++
+					if count >= limit {
+						return
+					}
 				}
 			}
 		}
-		readRing(s.fallback, offset, limit-count, out)
-		close(out)
+		// fallback
+		for d := range s.fallback.Read(offset, limit-count) {
+			out <- d
+			count++
+			if count >= limit {
+				return
+			}
+		}
 	}()
 	return out
 }
 
 func (s *Store) NumWrites() uint64 {
 	return s.numWrites.Load()
-}
-
-// readPart reads up to limit items from offset from given part,
-// sending on given channel, returning count sent
-func readRing(r *ring.Ring, offset, limit uint32, out chan []byte) uint32 {
-	var count uint32
-	data := r.Read(offset, limit)
-	for _, d := range data {
-		out <- d
-		count++
-	}
-	return count
 }
