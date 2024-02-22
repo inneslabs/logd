@@ -51,7 +51,7 @@ func (b *Ring) Read(offset, limit uint32) <-chan []byte {
 		if head < offset {
 			index = b.size - (offset - head)
 		} else {
-			index = head - offset
+			index = head - offset - 1
 		}
 
 		// Adjust if we're starting beyond the most recent write
@@ -62,10 +62,11 @@ func (b *Ring) Read(offset, limit uint32) <-chan []byte {
 		// Loop to send data through the channel
 		for reads < limit {
 			// Calculate the correct index to read from, wrapping around if necessary
-			readIndex := (index + reads) % b.size
-			if b.values[readIndex] != nil {
-				ch <- b.values[readIndex]
+			readIndex := (index - reads) % b.size
+			if b.values[readIndex] == nil {
+				break
 			}
+			ch <- b.values[readIndex]
 			reads++
 			// Stop if we've looped back to the head
 			if reads >= limit || readIndex == head {

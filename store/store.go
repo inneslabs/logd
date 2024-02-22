@@ -1,7 +1,6 @@
 package store
 
 import (
-	"fmt"
 	"strings"
 	"sync/atomic"
 
@@ -62,14 +61,12 @@ func (s *Store) Sizes() map[string]uint32 {
 // Read reads up to limit items, from offset,
 // all rings with the given key prefix
 func (s *Store) Read(keyPrefix string, offset, limit uint32) <-chan []byte {
-	fmt.Println("store.Read()", keyPrefix, offset, limit)
 	out := make(chan []byte)
 	go func() {
 		defer close(out)
 		// try to read from exact ring
 		exactRing := s.rings[keyPrefix]
 		if exactRing != nil {
-			fmt.Println("exact match", keyPrefix)
 			for d := range exactRing.Read(offset, limit) {
 				out <- d
 			}
@@ -79,7 +76,6 @@ func (s *Store) Read(keyPrefix string, offset, limit uint32) <-chan []byte {
 		// ranging through rings for prefix
 		for key, r := range s.rings {
 			if strings.HasPrefix(key, keyPrefix) {
-				fmt.Println(keyPrefix, "matched", key)
 				for d := range r.Read(offset, limit-count) {
 					out <- d
 					count++

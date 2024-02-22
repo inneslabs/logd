@@ -53,20 +53,22 @@ func main() {
 	fmt.Println("access-control-allow-origin set to", accessControlAllowOrigin)
 
 	// init store
-	svcSize := uint32(100000) // 100K logs per env/svc
+	svcSize := uint32(10000) // 10K logs per env/svc
 	logStore := store.NewStore(&store.Cfg{
 		RingSizes: map[string]uint32{
-			"/prod/logs":                svcSize,
+			"/prod/logs":                500000, // 500K
 			"/prod/ticker-service":      svcSize,
 			"/prod/taxonomy-service":    svcSize,
 			"/prod/swiplus-service":     svcSize,
 			"/prod/video-service":       svcSize,
 			"/prod/rss-service":         svcSize,
 			"/prod/swiplus-app-backend": svcSize,
-			"/prod/swi-core":            1000,
+			"/prod/newsletter-service":  svcSize,
+			"/prod/archive-service":     svcSize,
+			"/prod/swi-core":            svcSize,
 			// Plus internal fallback
 		},
-		FallbackSize: 500000, // 500K as fallback
+		FallbackSize: 500000, // 500K
 	})
 
 	// init root context

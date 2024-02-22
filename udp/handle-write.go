@@ -27,6 +27,9 @@ func (svc *UdpSvc) handleWrite(c *cmd.Cmd, unpk *auth.Unpacked) error {
 	// write to store
 	msgKey := c.Msg.GetKey()
 	segments := strings.Split(msgKey, "/") // [0]/[1-env]/[2-svc]/[3-fn]
+	if len(segments) < 3 {
+		return errors.New("invalid key")
+	}
 	storeKey := fmt.Sprintf("/%s/%s", segments[1], segments[2])
 	svc.logStore.Write(storeKey, msgBytes)
 	// send to tails
