@@ -25,7 +25,10 @@ func (svc *UdpSvc) handleWrite(c *cmd.Cmd, unpk *auth.Unpacked) error {
 		return fmt.Errorf("protobuf marshal msg err: %w", err)
 	}
 	// write to store
-	svc.logStore.Write(c.Msg.GetKey(), msgBytes)
+	msgKey := c.Msg.GetKey()
+	segments := strings.Split(msgKey, "/") // [0]/[1-env]/[2-svc]/[3-fn]
+	storeKey := fmt.Sprintf("/%s/%s", segments[1], segments[2])
+	svc.logStore.Write(storeKey, msgBytes)
 	// send to tails
 	svc.forSubs <- &ProtoPair{
 		Msg:   c.Msg,
