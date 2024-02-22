@@ -50,12 +50,12 @@ func NewSvc() *AlarmSvc {
 	return s
 }
 
-func (svc *AlarmSvc) Set(al *Alarm) {
+func (svc *AlarmSvc) SetAlarm(al *Alarm) {
 	svc.Alarms.Store(al.Name, al)
 	fmt.Println("set alarm:", al.Name)
 }
 
-func (svc *AlarmSvc) Put(msg *cmd.Msg) {
+func (svc *AlarmSvc) PutMsg(msg *cmd.Msg) {
 	svc.in <- msg
 }
 

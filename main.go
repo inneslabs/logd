@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/intob/jfmt"
 	"github.com/swissinfo-ch/logd/app"
 	"github.com/swissinfo-ch/logd/store"
 	"github.com/swissinfo-ch/logd/udp"
@@ -47,11 +48,6 @@ func main() {
 		accessControlAllowOrigin = accessControlAllowOriginEnv
 	}
 
-	// print config insensitive config
-	fmt.Println("udp port set to", udpLaddrPort)
-	fmt.Println("app port set to", appPort)
-	fmt.Println("access-control-allow-origin set to", accessControlAllowOrigin)
-
 	// init store
 	svcSize := uint32(10000) // 10K logs per env/svc
 	logStore := store.NewStore(&store.Cfg{
@@ -70,6 +66,14 @@ func main() {
 		},
 		FallbackSize: 500000, // 500K
 	})
+
+	// print config insensitive config
+	fmt.Println("udp port set to", udpLaddrPort)
+	fmt.Println("app port set to", appPort)
+	fmt.Println("access-control-allow-origin set to", accessControlAllowOrigin)
+	for key, size := range logStore.Sizes() {
+		fmt.Printf("%s:%s\n", jfmt.FmtCount32(size), key)
+	}
 
 	// init root context
 	ctx := getCtx()

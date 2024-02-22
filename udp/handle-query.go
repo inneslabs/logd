@@ -26,10 +26,6 @@ func (udpSvc *UdpSvc) handleQuery(query *cmd.Cmd, raddr netip.AddrPort, unpk *au
 	limit := limit(query.GetQueryParams().GetLimit())
 	keyPrefix := query.GetQueryParams().GetKeyPrefix()
 
-	if !strings.HasPrefix(keyPrefix, "/") {
-		keyPrefix = "/" + keyPrefix
-	}
-
 	for log := range udpSvc.logStore.Read(keyPrefix, offset, limit) {
 		msg := &cmd.Msg{}
 		err = proto.Unmarshal(log, msg)

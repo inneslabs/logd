@@ -45,7 +45,7 @@ func (s *Store) Heads() map[string]uint32 {
 	for key, ring := range s.rings {
 		heads[key] = ring.Head()
 	}
-	heads["_fallback"] = s.fallback.Head()
+	heads["/fallback"] = s.fallback.Head()
 	return heads
 }
 
@@ -54,7 +54,7 @@ func (s *Store) Sizes() map[string]uint32 {
 	for key, ring := range s.rings {
 		sizes[key] = ring.Size()
 	}
-	sizes["_fallback"] = s.fallback.Size()
+	sizes["/fallback"] = s.fallback.Size()
 	return sizes
 }
 
@@ -64,6 +64,12 @@ func (s *Store) Read(keyPrefix string, offset, limit uint32) <-chan []byte {
 	out := make(chan []byte)
 	go func() {
 		defer close(out)
+		if strings.HasPrefix(keyPrefix, "/fallback") {
+			for d := range s.fallback.Read(offset, limit) {
+				out <- d
+			}
+			return
+		}
 		// try to read from exact ring
 		exactRing := s.rings[keyPrefix]
 		if exactRing != nil {
@@ -83,14 +89,6 @@ func (s *Store) Read(keyPrefix string, offset, limit uint32) <-chan []byte {
 						return
 					}
 				}
-			}
-		}
-		// fallback
-		for d := range s.fallback.Read(offset, limit-count) {
-			out <- d
-			count++
-			if count >= limit {
-				return
 			}
 		}
 	}()

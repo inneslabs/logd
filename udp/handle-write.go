@@ -26,7 +26,7 @@ func (svc *UdpSvc) handleWrite(c *cmd.Cmd, unpk *auth.Unpacked) error {
 	}
 	// write to store
 	msgKey := c.Msg.GetKey()
-	segments := strings.Split(msgKey, "/") // [0]/[1-env]/[2-svc]/[3-fn]
+	segments := strings.Split(msgKey, "/") // /prod/swi-core/SMRotation
 	if len(segments) < 3 {
 		return errors.New("invalid key")
 	}
@@ -41,7 +41,7 @@ func (svc *UdpSvc) handleWrite(c *cmd.Cmd, unpk *auth.Unpacked) error {
 		// send prod errors to alarm svc
 		if strings.HasPrefix(c.Msg.GetKey(), "/prod") {
 			if c.Msg.GetLvl() == cmd.Lvl_ERROR || c.Msg.GetLvl() == cmd.Lvl_FATAL {
-				svc.alarmSvc.Put(c.Msg)
+				svc.alarmSvc.PutMsg(c.Msg)
 			}
 		}
 	}
