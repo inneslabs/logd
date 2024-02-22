@@ -199,16 +199,8 @@ func (svc *UdpSvc) writeToSubs() {
 
 func shouldSendToSub(sub *Sub, protoPair *ProtoPair) bool {
 	if sub.queryParams != nil {
-		qEnv := sub.queryParams.GetEnv()
-		if qEnv != "" && qEnv != protoPair.Msg.GetEnv() {
-			return false
-		}
-		qSvc := sub.queryParams.GetSvc()
-		if qSvc != "" && qSvc != protoPair.Msg.GetSvc() {
-			return false
-		}
-		qFn := sub.queryParams.GetFn()
-		if qFn != "" && qFn != protoPair.Msg.GetFn() {
+		keyPrefix := sub.queryParams.GetKeyPrefix()
+		if keyPrefix != "" && strings.HasPrefix(protoPair.Msg.GetKey(), keyPrefix) {
 			return false
 		}
 		qLvl := sub.queryParams.GetLvl()
@@ -229,7 +221,7 @@ func shouldSendToSub(sub *Sub, protoPair *ProtoPair) bool {
 
 func (svc *UdpSvc) reply(txt string, raddr netip.AddrPort) {
 	payload, _ := proto.Marshal(&cmd.Msg{
-		Fn:  "logd",
+		Key: "//logd",
 		Txt: &txt,
 	})
 	svc.subRateLimiter.Wait(context.Background())

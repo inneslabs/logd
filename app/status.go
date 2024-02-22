@@ -42,12 +42,11 @@ type RingInfo struct {
 }
 
 type AlarmStatus struct {
-	Name              string        `json:"name"`
-	Period            string        `json:"period"`
-	Threshold         int32         `json:"threshold"`
-	EventCount        int32         `json:"eventCount"`
-	TimeLastTriggered int64         `json:"timeLastTriggered"`
-	Report            *alarm.Report `json:"report"`
+	Name              string `json:"name"`
+	Period            string `json:"period"`
+	Threshold         int32  `json:"threshold"`
+	EventCount        int32  `json:"eventCount"`
+	TimeLastTriggered int64  `json:"timeLastTriggered"`
 }
 
 func (app *App) handleStatus(w http.ResponseWriter, r *http.Request) {
@@ -77,14 +76,16 @@ func (app *App) measureStatus() {
 
 			// build alarm report
 			alarms := make([]*alarm.Alarm, 0, 10)
-			app.alarmSvc.Alarms.Range(func(key, value any) bool {
-				al, ok := value.(*alarm.Alarm)
-				if !ok {
+			if app.alarmSvc != nil {
+				app.alarmSvc.Alarms.Range(func(key, value any) bool {
+					al, ok := value.(*alarm.Alarm)
+					if !ok {
+						return true
+					}
+					alarms = append(alarms, al)
 					return true
-				}
-				alarms = append(alarms, al)
-				return true
-			})
+				})
+			}
 
 			// build log store rings report
 			heads := app.logStore.Heads()

@@ -28,7 +28,6 @@ type Alarm struct {
 	// using sync.Map for better concurrent access
 	Events        sync.Map // key is unix milli
 	EventCount    atomic.Int32
-	Report        *Report
 	Action        func() error
 	LastTriggered time.Time
 }
@@ -61,7 +60,7 @@ func (svc *AlarmSvc) Put(msg *cmd.Msg) {
 }
 
 func (svc *AlarmSvc) matchMsgs() {
-	fmt.Println("alarm-matching gopher started")
+	fmt.Println("msg-matching gopher started")
 	for msg := range svc.in {
 		t := msg.T.AsTime().UnixMicro()
 		svc.Alarms.Range(func(key, value interface{}) bool {
@@ -117,7 +116,6 @@ func (svc *AlarmSvc) callActions() {
 	for a := range svc.triggered {
 		fmt.Println("alarm triggered:", a.Name)
 		a.LastTriggered = time.Now()
-		a.createReport()
 		// prevent immediate firing
 		if time.Now().Before(svc.started.Add(a.Period)) {
 			fmt.Println("skipped action, app just started")

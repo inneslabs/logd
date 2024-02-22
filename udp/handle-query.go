@@ -24,16 +24,7 @@ func (udpSvc *UdpSvc) handleQuery(query *cmd.Cmd, raddr netip.AddrPort, unpk *au
 
 	offset := query.GetQueryParams().GetOffset()
 	limit := limit(query.GetQueryParams().GetLimit())
-	env := query.GetQueryParams().GetEnv()
-	svc := query.GetQueryParams().GetSvc()
-
-	keyPrefix := "/"
-	if env != "" {
-		keyPrefix += env
-		if svc != "" {
-			keyPrefix += svc
-		}
-	}
+	keyPrefix := query.GetQueryParams().GetKeyPrefix()
 
 	for log := range udpSvc.logStore.Read(keyPrefix, offset, limit) {
 		msg := &cmd.Msg{}
@@ -62,7 +53,6 @@ func (udpSvc *UdpSvc) handleQuery(query *cmd.Cmd, raddr netip.AddrPort, unpk *au
 func matchMsg(msg *cmd.Msg, query *cmd.Cmd) bool {
 	tStart := tStart(query.GetQueryParams())
 	tEnd := tEnd(query.GetQueryParams())
-	fn := query.GetQueryParams().GetFn()
 	lvl := query.GetQueryParams().GetLvl()
 	txt := query.GetQueryParams().GetTxt()
 	httpMethod := query.GetQueryParams().GetHttpMethod()
@@ -73,9 +63,6 @@ func matchMsg(msg *cmd.Msg, query *cmd.Cmd) bool {
 		return false
 	}
 	if tEnd != nil && msgT.After(*tEnd) {
-		return false
-	}
-	if fn != "" && fn != msg.GetFn() {
 		return false
 	}
 	if lvl != cmd.Lvl_LVL_UNKNOWN && lvl != msg.GetLvl() {

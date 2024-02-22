@@ -6,6 +6,7 @@ package udp
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/swissinfo-ch/logd/auth"
 	"github.com/swissinfo-ch/logd/cmd"
@@ -24,17 +25,18 @@ func (svc *UdpSvc) handleWrite(c *cmd.Cmd, unpk *auth.Unpacked) error {
 		return fmt.Errorf("protobuf marshal msg err: %w", err)
 	}
 	// write to store
-	key := fmt.Sprintf("/%s/%s", c.Msg.GetEnv(), c.Msg.GetSvc())
-	svc.logStore.Write(key, msgBytes)
+	svc.logStore.Write(c.Msg.GetKey(), msgBytes)
 	// send to tails
 	svc.forSubs <- &ProtoPair{
 		Msg:   c.Msg,
 		Bytes: msgBytes,
 	}
-	// send prod errors to alarm svc
-	if c.Msg.GetEnv() == "prod" {
-		if c.Msg.GetLvl() == cmd.Lvl_ERROR || c.Msg.GetLvl() == cmd.Lvl_FATAL {
-			svc.alarmSvc.Put(c.Msg)
+	if svc.alarmSvc != nil {
+		// send prod errors to alarm svc
+		if strings.HasPrefix(c.Msg.GetKey(), "/prod") {
+			if c.Msg.GetLvl() == cmd.Lvl_ERROR || c.Msg.GetLvl() == cmd.Lvl_FATAL {
+				svc.alarmSvc.Put(c.Msg)
+			}
 		}
 	}
 	return nil
