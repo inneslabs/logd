@@ -29,12 +29,14 @@ type MachineInfo struct {
 }
 
 type StoreInfo struct {
-	Writes         uint64               `json:"writes"`
-	Rings          map[string]*RingInfo `json:"rings"`
-	MaxWritePerSec uint64               `json:"maxWritePerSec"`
+	Writes uint64 `json:"writes"`
+	// iterables are easier than maps in JS
+	Rings          []*RingInfo `json:"rings"`
+	MaxWritePerSec uint64      `json:"maxWritePerSec"`
 }
 
 type RingInfo struct {
+	Key  string `json:"key"`
 	Head uint32 `json:"head"`
 	Size uint32 `json:"size"`
 }
@@ -87,13 +89,17 @@ func (app *App) measureStatus() {
 			// build log store rings report
 			heads := app.logStore.Heads()
 			sizes := app.logStore.Sizes()
-			rings := make(map[string]*RingInfo, len(heads))
+			rings := make([]*RingInfo, 0, len(heads))
 			for key := range heads {
-				rings[key] = &RingInfo{
+				rings = append(rings, &RingInfo{
+					Key:  key,
 					Head: heads[key],
 					Size: sizes[key],
-				}
+				})
 			}
+			sort.Slice(rings, func(i, j int) bool {
+				return rings[i].Key < rings[j].Key
+			})
 
 			info := &Status{
 				Commit: app.commit,
@@ -118,8 +124,6 @@ func (app *App) measureStatus() {
 					TimeLastTriggered: a.LastTriggered.UnixMilli(),
 				})
 			}
-
-			// Sort alarms by name
 			sort.Slice(info.Alarms, func(i, j int) bool {
 				return info.Alarms[i].Name < info.Alarms[j].Name
 			})
