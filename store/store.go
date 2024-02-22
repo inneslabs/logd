@@ -61,15 +61,9 @@ func (s *Store) Sizes() map[string]uint32 {
 // Read reads up to limit items, from offset,
 // all rings with the given key prefix
 func (s *Store) Read(keyPrefix string, offset, limit uint32) <-chan []byte {
-	out := make(chan []byte)
+	out := make(chan []byte, 1)
 	go func() {
 		defer close(out)
-		if strings.HasPrefix(keyPrefix, "/fallback") {
-			for d := range s.fallback.Read(offset, limit) {
-				out <- d
-			}
-			return
-		}
 		// try to read from exact ring
 		exactRing := s.rings[keyPrefix]
 		if exactRing != nil {
@@ -79,9 +73,11 @@ func (s *Store) Read(keyPrefix string, offset, limit uint32) <-chan []byte {
 			return
 		}
 		var count uint32
+		var matchedPrefix bool
 		// ranging through rings for prefix
 		for key, r := range s.rings {
 			if strings.HasPrefix(key, keyPrefix) {
+				matchedPrefix = true
 				for d := range r.Read(offset, limit-count) {
 					out <- d
 					count++
@@ -89,6 +85,12 @@ func (s *Store) Read(keyPrefix string, offset, limit uint32) <-chan []byte {
 						return
 					}
 				}
+			}
+		}
+		if !matchedPrefix {
+			// fallback
+			for d := range s.fallback.Read(offset, limit) {
+				out <- d
 			}
 		}
 	}()

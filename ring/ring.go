@@ -43,38 +43,35 @@ func (b *Ring) Read(offset, limit uint32) <-chan []byte {
 		if limit > b.size {
 			limit = b.size
 		}
-
+		reads := uint32(0)
 		head := b.head.Load()
 
-		// Calculate the actual number of written entries to avoid reading uninitialized data
-		written := head
-		if written > b.size {
-			written = b.size
-		}
-
-		// Calculate start index based on offset, ensuring it wraps correctly
 		var index uint32
-		if written <= offset {
-			// If offset is beyond what's written, don't read anything
-			return
+		// Calculate start index based on offset, ensuring it wraps correctly
+		if head < offset {
+			index = b.size - (offset - head)
 		} else {
-			// Adjust index to start reading from the correct position
-			index = (head + b.size - offset) % b.size
-			if index == 0 && offset > 0 {
-				// Special case when offset equals the size
-				index = b.size - 1
-			} else if index > 0 {
-				// Normally, decrement to get the correct starting position
-				index -= 1
-			}
+			index = head - offset - 1
 		}
 
-		reads := uint32(0)
-		// Loop to send data through the channel, reading forwards
-		for reads < limit && reads < written {
-			readIndex := (index + reads) % b.size
+		// Adjust if we're starting beyond the most recent write
+		if index == b.size {
+			index = 0
+		}
+
+		// Loop to send data through the channel
+		for reads < limit {
+			// Calculate the correct index to read from, wrapping around if necessary
+			readIndex := (index - reads) % b.size
+			if b.values[readIndex] == nil {
+				break
+			}
 			ch <- b.values[readIndex]
 			reads++
+			// Stop if we've looped back to the head
+			if reads >= limit || readIndex == head {
+				break
+			}
 		}
 	}()
 

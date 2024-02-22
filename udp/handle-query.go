@@ -12,7 +12,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const hardLimit = 1000
+const hardLimit = 100000
 
 func (udpSvc *UdpSvc) handleQuery(query *cmd.Cmd, raddr netip.AddrPort, unpk *auth.Unpacked) error {
 	valid, err := auth.Verify(udpSvc.readSecret, unpk)
@@ -51,6 +51,11 @@ func (udpSvc *UdpSvc) handleQuery(query *cmd.Cmd, raddr netip.AddrPort, unpk *au
 }
 
 func matchMsg(msg *cmd.Msg, query *cmd.Cmd) bool {
+	keyPrefix := query.GetQueryParams().GetKeyPrefix()
+	if keyPrefix != "" && !strings.HasPrefix(msg.GetKey(), keyPrefix) {
+		return false
+	}
+
 	tStart := tStart(query.GetQueryParams())
 	tEnd := tEnd(query.GetQueryParams())
 	lvl := query.GetQueryParams().GetLvl()
@@ -59,6 +64,7 @@ func matchMsg(msg *cmd.Msg, query *cmd.Cmd) bool {
 	url := query.GetQueryParams().GetUrl()
 	responseStatus := query.GetQueryParams().GetResponseStatus()
 	msgT := msg.T.AsTime()
+
 	if tStart != nil && msgT.Before(*tStart) {
 		return false
 	}
