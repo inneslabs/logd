@@ -1,30 +1,31 @@
 # Logd
 ![A circular buffer](.doc/circular_buffer.svg)
 
-## Logs for your apps in constant time and constant space.
-Logd (pronounced "logged") is a circular buffer for writing & reading millions of logs per minute.
+## Tail & query logs for unlimited apps.
+Logd is an application that stores an in-memory map of ring buffers. The service listens for ephemerally-signed UDP packets. Each packet is a log event.
 
-Logd will never run out of memory if the buffer size is ok for the given machine spec. Reads & writes are constant-time.
+The protocol is very simple, defined in Protobuf. 
 
-As the buffer becomes full, each write overwrites the oldest element.
+Logd will never run out of memory if the buffer sizes are ok for the provisioned memory.
+
+The buffer uses a single moving pointer, `head`. Each write advances the pointer forward. Reading is normally back from `head`. **No mutex**, `head` is an `atomic.Uint32`. This is a key reason for the performance of the ring buffer.
 
 # To Do
-## Use circular buffer per alarm to store events
-Currently, the app will OOM if we get a million errors. To solve this, use a circular buffer, as already used for main storage.
+## Mmove to AWS, or bridge WireGuard PN with VPC.
+I want to applications to write directly to Logd. This will give us **REALTIME** log data. Some apps run in the VPC. I also want to put logd in the PN, and expose only the HTTP endpoint externally (only status). Authenticated RPCs are already **ONLY OVER UDP**.
+
+## Fix replay vulnerability
+There is currently no cache of UDP packet hashes, so we can't yet detect & drop a replay. A small ring buffer would probably be ideal for this.
 `Estimated time: 2 hours`
 
-## Cleaner way of sending daily or hourly reports
-Currently, the Period & Threshold are used to configure an alarm that fires daily. This is not a nice pattern. The intent of the alarm service does not align with the intent of that alarm configuration.
-A better solution would be to trigger a report on a daily basis, using an alarm that collects the events but has no action.
-`Estimated time: 2 hours`
-
-## Fix Replay Vulnerability
-There is currently no cache of UDP packet hashes, so we can't yet detect/prevent a replay. A ring buffer would probably be ideal for this.
-`Estimated time: 2 hours`
+## Automate secret rotation
+Once the Secrets Manager Rotation topic is in production, we can integrate this.
+There is one consideration. We will need to periodically read the env var so that we can update this during runtime, without need to restart the application.
+**Maybe it is no-longer necessary to store this secret in the SOPS file.**
+`Estimated time: 4 hours`
 
 # Auth
-Logd authenticates clients for either reading or writing using 2 shared secrets.
-These are stored encrypted in our secrets SOPS file.
+Logd authenticates clients for either reading or writing using shared that could be named `LOGD_READ_SECRET` and `LOGD_WRITE_SECRET`. These are stored encrypted in our secrets SOPS file, and set in AWS Secrets Manager.
 
 ## Why no SSO?
 Writing is over UDP only, anyway. This will not change. This is an important design choice that ensures performance, but also separation of concerns.
@@ -47,16 +48,18 @@ curl --location "$LOGD_HOST/?limit=10" \
 Logd is built on Protobuf & UDP.
 
 ## Logger
-The simplest way to write logs is using the `log` package.
+The simplest way to write logs is using the `logger` package.
 ```go
-l, _ := log.NewLogger(&log.LoggerConfig{
-  Host:        "logd.fly.dev",
-  WriteSecret: "the-secret",
-  Env:         "prod",
-  Svc:         "example-service",
-  Fn:          "Readme",
+log, _ := logger.NewLogger(&logger.LoggerConfig{
+  // Host:     optional
+  // Port:     optional
+  WriteSecret: "the-very-secret-secret",
+  Env:         "very-productive",
+  Svc:         "readme-service",
+  Fn:          "ReadmeApp",
+  Stdout:      true // also write to stdout
 })
-l.Log(log.Info, "this is an example %s", "log message")
+log.Log(logger.Info, "this is an example %s", "log message")
 ```
 
 ## Custom integration
