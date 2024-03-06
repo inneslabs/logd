@@ -5,7 +5,6 @@ package udp
 
 import (
 	"fmt"
-	"net"
 	"time"
 )
 
@@ -18,9 +17,9 @@ func (svc *UdpSvc) kickLateSubs() {
 	for {
 		select {
 		case <-time.After(PingPeriod):
-			for raddr, sub := range svc.subs {
+			for _, sub := range svc.subs {
 				if sub.lastPing.Before(time.Now().Add(-(PingPeriod * kickAfterMissingPings))) {
-					svc.kickSub(svc.conn, sub, raddr)
+					svc.kickSub(sub)
 					return
 				}
 			}
@@ -32,10 +31,10 @@ func (svc *UdpSvc) kickLateSubs() {
 }
 
 // kickSub removes sub from map
-func (svc *UdpSvc) kickSub(conn *net.UDPConn, sub *Sub, raddr string) {
+func (svc *UdpSvc) kickSub(sub *Sub) {
 	svc.subsMu.Lock()
-	delete(svc.subs, raddr)
+	delete(svc.subs, sub.raddr.String())
 	svc.subsMu.Unlock()
-	fmt.Printf("kicked %s\n", raddr)
+	fmt.Printf("kicked %s\n", sub.raddr.String())
 	svc.reply("kick", sub.raddr)
 }
