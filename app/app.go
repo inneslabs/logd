@@ -96,7 +96,7 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		return
 	}
-	app.handleStatus(w, r)
+	app.handleStatus(w)
 }
 
 func (app *App) corsMiddleware(next http.Handler) http.Handler {

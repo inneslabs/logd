@@ -49,7 +49,7 @@ type AlarmStatus struct {
 	TimeLastTriggered int64  `json:"timeLastTriggered"`
 }
 
-func (app *App) handleStatus(w http.ResponseWriter, r *http.Request) {
+func (app *App) handleStatus(w http.ResponseWriter) {
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Length", strconv.Itoa(len(app.statusJson)))
 	w.Write(app.statusJson)
