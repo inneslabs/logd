@@ -14,11 +14,22 @@ The buffer uses a single moving pointer, `head`. Each write advances the pointer
 ## Mmove to AWS, or bridge WireGuard PN with VPC.
 I want to applications to write directly to Logd. This will give us **REALTIME** log data. Some apps run in the VPC. I also want to put logd in the PN, and expose only the HTTP endpoint externally (only status). Authenticated RPCs are already **ONLY OVER UDP**.
 
-## Fix replay vulnerability
+### 2024-03-07 Decision to move to AWS.
+See (./doc/bridge-fly-aws.md)[bridging fly with aws].
+This would involve either configuring WireGuard on an EC2 instance, or configuring a VPN Gateway service from AWS.
+
+The added complexity & therefore caution required currently seems to outweight the advantage of running apps on fly.
+
+Therefore, I will migrate logd & zoe to EC2 instances. We can then benefit from the simplicity of running logged in the private network, and exposing only the http port for the status json externally.
+
+## Fix replay-attack vulnerability
+Note: If we run logd in the private network, this is absolutely no issue, but would be nice to implement for sake of correctness.
+
 There is currently no cache of UDP packet hashes, so we can't yet detect & drop a replay. A small ring buffer would probably be ideal for this.
 `Estimated time: 2 hours`
 
 ## Automate secret rotation
+Note: Easier on EC2. See Move to AWS.
 Once the Secrets Manager Rotation topic is in production, we can integrate this.
 There is one consideration. We will need to periodically read the env var so that we can update this during runtime, without need to restart the application.
 **Maybe it is no-longer necessary to store this secret in the SOPS file.**
@@ -27,12 +38,10 @@ There is one consideration. We will need to periodically read the env var so tha
 # Auth
 Logd authenticates clients for either reading or writing using shared that could be named `LOGD_READ_SECRET` and `LOGD_WRITE_SECRET`. These are stored encrypted in our secrets SOPS file, and set in AWS Secrets Manager.
 
-## Why no SSO?
-Writing is over UDP only, anyway. This will not change. This is an important design choice that ensures performance, but also separation of concerns.
+## Why shared secrets?
+Writing is over UDP only. This will not change because cheap real-time logging is the core offering.
 
-If you want to put the HTTP API behind SSO, just write a proxy. ;)
-
-This is a simple, performant & usable application that you can, and should, build on.
+I chose to use hash-based ephemeral message authentication with a very short signature ttl (100ms) to limit the potential for replays. Preventing replays futher is then much easier & less computationally expensive.
 
 # HTTP API
 Logd starts a http server.
