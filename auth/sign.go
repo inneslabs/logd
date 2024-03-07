@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	sigTtl  = time.Millisecond * 500
+	sigTtl  = time.Millisecond * 100
 	SumLen  = 32
 	TimeLen = 8
 )
