@@ -52,7 +52,7 @@ func main() {
 	svcSize := uint32(10000) // 10K logs per env/svc
 	logStore := store.NewStore(&store.Cfg{
 		RingSizes: map[string]uint32{
-			"/prod/logs":                500000, // 500K
+			"/prod/wp":              500000,
 			"/prod/ticker-service":      svcSize,
 			"/prod/taxonomy-service":    svcSize,
 			"/prod/swiplus-service":     svcSize,
@@ -61,10 +61,9 @@ func main() {
 			"/prod/swiplus-app-backend": svcSize,
 			"/prod/newsletter-service":  svcSize,
 			"/prod/archive-service":     svcSize,
-			"/prod/swi-core":            svcSize,
-			// Plus internal fallback
+			"/prod/swi-core":            1000,
 		},
-		FallbackSize: 500000, // 500K
+		FallbackSize: 500000,
 	})
 
 	// print config insensitive config
