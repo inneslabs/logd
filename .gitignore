@@ -5,3 +5,4 @@ test.sh
 .vscode/launch.json
 logd
 commit
+logdrc.yml

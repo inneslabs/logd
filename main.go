@@ -24,6 +24,9 @@ func main() {
 		UdpLaddrPort:             ":6102",
 		AppPort:                  6101,
 		AccessControlAllowOrigin: "*",
+		Store: &store.Cfg{
+			FallbackSize: 100000,
+		},
 	}
 
 	err := cfg.Load("logdrc.yml", config)
@@ -31,30 +34,14 @@ func main() {
 		fmt.Println(err)
 	}
 
-	// init store
-	svcSize := uint32(10000) // 10K logs per env/svc
-	logStore := store.NewStore(&store.Cfg{
-		RingSizes: map[string]uint32{
-			"/prod/wp":                  500000,
-			"/prod/ticker-service":      svcSize,
-			"/prod/taxonomy-service":    svcSize,
-			"/prod/swiplus-service":     svcSize,
-			"/prod/video-service":       svcSize,
-			"/prod/rss-service":         svcSize,
-			"/prod/swiplus-app-backend": svcSize,
-			"/prod/newsletter-service":  svcSize,
-			"/prod/archive-service":     svcSize,
-			"/prod/swi-core":            1000,
-		},
-		FallbackSize: 500000,
-	})
+	logStore := store.NewStore(config.Store)
 
 	// print config insensitive config
 	fmt.Println("udp port set to", config.UdpLaddrPort)
 	fmt.Println("app port set to", config.AppPort)
 	fmt.Println("access-control-allow-origin set to", config.AccessControlAllowOrigin)
 	for key, size := range logStore.Sizes() {
-		fmt.Printf("%s:%s\n", jfmt.FmtCount32(size), key)
+		fmt.Printf("%s: %s\n", key, jfmt.FmtCount32(size))
 	}
 
 	// init root context

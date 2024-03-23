@@ -14,8 +14,8 @@ type Store struct {
 }
 
 type Cfg struct {
-	RingSizes    map[string]uint32
-	FallbackSize uint32
+	RingSizes    map[string]uint32 `yaml:"ring_sizes"`
+	FallbackSize uint32            `yaml:"fallback_size"`
 }
 
 func NewStore(cfg *Cfg) *Store {

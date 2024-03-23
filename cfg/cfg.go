@@ -4,15 +4,17 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/intob/logd/store"
 	"gopkg.in/yaml.v3"
 )
 
 type LogdCfg struct {
-	UdpLaddrPort             string // string supports fly-global-services:6102
-	AppPort                  int
-	ReadSecret               string
-	WriteSecret              string
-	AccessControlAllowOrigin string
+	UdpLaddrPort             string     `yaml:"udp_laddr_port"` // string supports fly-global-services:6102
+	AppPort                  int        `yaml:"app_port"`
+	ReadSecret               string     `yaml:"read_secret"`
+	WriteSecret              string     `yaml:"write_secret"`
+	AccessControlAllowOrigin string     `yaml:"access_control_allow_origin"`
+	Store                    *store.Cfg `yaml:"store"`
 }
 
 func Load(fname string, cfg *LogdCfg) error {
