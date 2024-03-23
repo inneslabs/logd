@@ -8,44 +8,27 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 	"time"
 
 	"github.com/intob/jfmt"
 	"github.com/intob/logd/app"
+	"github.com/intob/logd/cfg"
 	"github.com/intob/logd/store"
 	"github.com/intob/logd/udp"
 )
 
 func main() {
-	// no default, can also be blank
-	readSecret := os.Getenv("LOGD_READ_SECRET")
-	writeSecret := os.Getenv("LOGD_WRITE_SECRET")
-	//slackWebhook := os.Getenv("LOGD_SLACK_WEBHOOK")
-
 	// defaults
-	udpLaddrPort := ":6102" // string supports fly-global-services:6102
-	appPort := 6101
-	accessControlAllowOrigin := "*"
-
-	udpPortEnv, set := os.LookupEnv("LOGD_UDP_LADDRPORT")
-	if set {
-		udpLaddrPort = udpPortEnv
+	config := &cfg.LogdCfg{
+		UdpLaddrPort:             ":6102",
+		AppPort:                  6101,
+		AccessControlAllowOrigin: "*",
 	}
 
-	appPortEnv, set := os.LookupEnv("LOGD_APP_PORT")
-	if set {
-		var err error
-		appPort, err = strconv.Atoi(appPortEnv)
-		if err != nil {
-			panic("LOGD_APP_PORT must be an int")
-		}
-	}
-
-	accessControlAllowOriginEnv, set := os.LookupEnv("LOGD_ACCESS_CONTROL_ALLOW_ORIGIN")
-	if set {
-		accessControlAllowOrigin = accessControlAllowOriginEnv
+	err := cfg.Load("logdrc.yml", config)
+	if err != nil {
+		fmt.Println(err)
 	}
 
 	// init store
@@ -67,9 +50,9 @@ func main() {
 	})
 
 	// print config insensitive config
-	fmt.Println("udp port set to", udpLaddrPort)
-	fmt.Println("app port set to", appPort)
-	fmt.Println("access-control-allow-origin set to", accessControlAllowOrigin)
+	fmt.Println("udp port set to", config.UdpLaddrPort)
+	fmt.Println("app port set to", config.AppPort)
+	fmt.Println("access-control-allow-origin set to", config.AccessControlAllowOrigin)
 	for key, size := range logStore.Sizes() {
 		fmt.Printf("%s:%s\n", jfmt.FmtCount32(size), key)
 	}
@@ -80,9 +63,9 @@ func main() {
 	// init udp
 	udp.NewSvc(&udp.Cfg{
 		Ctx:                 ctx,
-		LaddrPort:           udpLaddrPort,
-		ReadSecret:          readSecret,
-		WriteSecret:         writeSecret,
+		LaddrPort:           config.UdpLaddrPort,
+		ReadSecret:          config.ReadSecret,
+		WriteSecret:         config.WriteSecret,
 		LogStore:            logStore,
 		SubRateLimitEvery:   100 * time.Microsecond,
 		SubRateLimitBurst:   50,
@@ -96,8 +79,8 @@ func main() {
 		LogStore:                 logStore,
 		RateLimitEvery:           time.Second,
 		RateLimitBurst:           10,
-		Port:                     appPort,
-		AccessControlAllowOrigin: accessControlAllowOrigin,
+		Port:                     config.AppPort,
+		AccessControlAllowOrigin: config.AccessControlAllowOrigin,
 	})
 
 	// wait for kill signal

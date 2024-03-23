@@ -49,7 +49,7 @@ func NewApp(cfg *Cfg) *App {
 	// read commit file
 	commit, err := os.ReadFile("commit")
 	if err != nil {
-		panic(fmt.Sprintf("failed to read commit file: %s", err))
+		fmt.Println("failed to read commit file:", err)
 	}
 	app := &App{
 		// cfg
