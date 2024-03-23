@@ -11,8 +11,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/swissinfo-ch/logd/alarm"
-	"github.com/swissinfo-ch/logd/store"
+	"github.com/intob/logd/store"
 	"golang.org/x/time/rate"
 )
 
@@ -21,7 +20,6 @@ type App struct {
 	ctx                      context.Context
 	port                     int
 	logStore                 *store.Store
-	alarmSvc                 *alarm.AlarmSvc
 	rateLimitEvery           time.Duration
 	rateLimitBurst           int
 	accessControlAllowOrigin string
@@ -37,7 +35,6 @@ type Cfg struct {
 	Ctx                      context.Context
 	Port                     int
 	LogStore                 *store.Store
-	AlarmSvc                 *alarm.AlarmSvc
 	RateLimitEvery           time.Duration
 	RateLimitBurst           int
 	AccessControlAllowOrigin string
@@ -59,7 +56,6 @@ func NewApp(cfg *Cfg) *App {
 		ctx:                      cfg.Ctx,
 		port:                     cfg.Port,
 		logStore:                 cfg.LogStore,
-		alarmSvc:                 cfg.AlarmSvc,
 		rateLimitEvery:           cfg.RateLimitEvery,
 		rateLimitBurst:           cfg.RateLimitBurst,
 		accessControlAllowOrigin: cfg.AccessControlAllowOrigin,

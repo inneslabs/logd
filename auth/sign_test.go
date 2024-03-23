@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/swissinfo-ch/logd/cmd"
+	"github.com/intob/logd/cmd"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

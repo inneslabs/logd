@@ -13,15 +13,13 @@ import (
 	"time"
 
 	"github.com/intob/jfmt"
-	"github.com/swissinfo-ch/logd/alarm"
 )
 
 type Status struct {
-	Commit  string         `json:"commit"`
-	Uptime  string         `json:"uptime"`
-	Machine *MachineInfo   `json:"machine"`
-	Store   *StoreInfo     `json:"store"`
-	Alarms  []*AlarmStatus `json:"alarms"`
+	Commit  string       `json:"commit"`
+	Uptime  string       `json:"uptime"`
+	Machine *MachineInfo `json:"machine"`
+	Store   *StoreInfo   `json:"store"`
 }
 
 type MachineInfo struct {
@@ -39,14 +37,6 @@ type RingInfo struct {
 	Key  string `json:"key"`
 	Head uint32 `json:"head"`
 	Size uint32 `json:"size"`
-}
-
-type AlarmStatus struct {
-	Name              string `json:"name"`
-	Period            string `json:"period"`
-	Threshold         int32  `json:"threshold"`
-	EventCount        int32  `json:"eventCount"`
-	TimeLastTriggered int64  `json:"timeLastTriggered"`
 }
 
 func (app *App) handleStatus(w http.ResponseWriter) {
@@ -74,19 +64,6 @@ func (app *App) measureStatus() {
 			lastWrites = writes
 			lastTime = time.Now()
 
-			// build alarm report
-			alarms := make([]*alarm.Alarm, 0, 10)
-			if app.alarmSvc != nil {
-				app.alarmSvc.Alarms.Range(func(key, value any) bool {
-					al, ok := value.(*alarm.Alarm)
-					if !ok {
-						return true
-					}
-					alarms = append(alarms, al)
-					return true
-				})
-			}
-
 			// build log store rings report
 			heads := app.logStore.Heads()
 			sizes := app.logStore.Sizes()
@@ -113,21 +90,7 @@ func (app *App) measureStatus() {
 					Rings:          rings,
 					MaxWritePerSec: maxWritePerSec,
 				},
-				Alarms: make([]*AlarmStatus, 0, len(alarms)),
 			}
-
-			for _, a := range alarms {
-				info.Alarms = append(info.Alarms, &AlarmStatus{
-					Name:              a.Name,
-					Period:            jfmt.FmtDuration(a.Period),
-					Threshold:         a.Threshold,
-					EventCount:        a.EventCount.Load(),
-					TimeLastTriggered: a.LastTriggered.UnixMilli(),
-				})
-			}
-			sort.Slice(info.Alarms, func(i, j int) bool {
-				return info.Alarms[i].Name < info.Alarms[j].Name
-			})
 
 			data, err := json.Marshal(info)
 			if err != nil {

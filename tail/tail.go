@@ -8,9 +8,9 @@ import (
 	"net"
 	"time"
 
-	"github.com/swissinfo-ch/logd/auth"
-	"github.com/swissinfo-ch/logd/cmd"
-	"github.com/swissinfo-ch/logd/udp"
+	"github.com/intob/logd/auth"
+	"github.com/intob/logd/cmd"
+	"github.com/intob/logd/udp"
 	"google.golang.org/protobuf/proto"
 )
 

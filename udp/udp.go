@@ -12,16 +12,19 @@ import (
 	"sync"
 	"time"
 
-	"github.com/swissinfo-ch/logd/alarm"
-	"github.com/swissinfo-ch/logd/auth"
-	"github.com/swissinfo-ch/logd/cmd"
-	"github.com/swissinfo-ch/logd/store"
+	"github.com/intob/logd/auth"
+	"github.com/intob/logd/cmd"
+	"github.com/intob/logd/store"
 	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
 )
 
 const MaxPacketSize = 1920
 
+// IMPORTANT:
+// REPLAY VULNERABILITY MUST BE SOLVED,
+// THIS THING IS BROKEN VERY EASILY.
+// THIS SHOULD RUN IN A PRIVATE NETWORK.
 type UdpSvc struct {
 	ctx              context.Context
 	laddrPort        string
@@ -35,7 +38,6 @@ type UdpSvc struct {
 	writeSecret      []byte
 	logStore         *store.Store
 	unpkPool         *sync.Pool
-	alarmSvc         *alarm.AlarmSvc
 }
 
 type Cfg struct {
@@ -44,7 +46,6 @@ type Cfg struct {
 	ReadSecret          string
 	WriteSecret         string
 	LogStore            *store.Store
-	AlarmSvc            *alarm.AlarmSvc
 	SubRateLimitEvery   time.Duration
 	SubRateLimitBurst   int
 	QueryRateLimitEvery time.Duration
@@ -80,7 +81,6 @@ func NewSvc(cfg *Cfg) *UdpSvc {
 		readSecret:       []byte(cfg.ReadSecret),
 		writeSecret:      []byte(cfg.WriteSecret),
 		logStore:         cfg.LogStore,
-		alarmSvc:         cfg.AlarmSvc,
 		unpkPool: &sync.Pool{
 			New: func() any {
 				return &auth.Unpacked{

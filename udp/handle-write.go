@@ -8,8 +8,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/swissinfo-ch/logd/auth"
-	"github.com/swissinfo-ch/logd/cmd"
+	"github.com/intob/logd/auth"
+	"github.com/intob/logd/cmd"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -36,14 +36,6 @@ func (svc *UdpSvc) handleWrite(c *cmd.Cmd, unpk *auth.Unpacked) error {
 	svc.forSubs <- &ProtoPair{
 		Msg:   c.Msg,
 		Bytes: msgBytes,
-	}
-	if svc.alarmSvc != nil {
-		// send prod errors to alarm svc
-		if strings.HasPrefix(c.Msg.GetKey(), "/prod") {
-			if c.Msg.GetLvl() == cmd.Lvl_ERROR || c.Msg.GetLvl() == cmd.Lvl_FATAL {
-				svc.alarmSvc.PutMsg(c.Msg)
-			}
-		}
 	}
 	return nil
 }

@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/swissinfo-ch/logd/auth"
-	"github.com/swissinfo-ch/logd/cmd"
+	"github.com/intob/logd/auth"
+	"github.com/intob/logd/cmd"
 	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"

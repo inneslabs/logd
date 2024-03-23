@@ -4,7 +4,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/swissinfo-ch/logd/ring"
+	"github.com/intob/logd/ring"
 )
 
 type Store struct {

@@ -5,7 +5,7 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/swissinfo-ch/logd/auth"
+	"github.com/intob/logd/auth"
 )
 
 func (svc *UdpSvc) handlePing(raddr netip.AddrPort, unpk *auth.Unpacked) error {

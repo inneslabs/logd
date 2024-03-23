@@ -1,4 +1,0 @@
-# flyctl launch added from .gitignore
-**/.DS_Store
-**/out.json
-fly.toml

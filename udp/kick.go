@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	PingPeriod            = time.Second
+	PingPeriod            = time.Second * 2
 	kickAfterMissingPings = 5
 )
 

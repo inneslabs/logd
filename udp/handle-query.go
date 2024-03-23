@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/swissinfo-ch/logd/auth"
-	"github.com/swissinfo-ch/logd/cmd"
+	"github.com/intob/logd/auth"
+	"github.com/intob/logd/cmd"
 	"google.golang.org/protobuf/proto"
 )
 

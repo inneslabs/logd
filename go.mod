@@ -1,4 +1,4 @@
-module github.com/swissinfo-ch/logd
+module github.com/intob/logd
 
 go 1.22.0
 

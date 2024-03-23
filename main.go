@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/intob/jfmt"
-	"github.com/swissinfo-ch/logd/app"
-	"github.com/swissinfo-ch/logd/store"
-	"github.com/swissinfo-ch/logd/udp"
+	"github.com/intob/logd/app"
+	"github.com/intob/logd/store"
+	"github.com/intob/logd/udp"
 )
 
 func main() {
@@ -52,7 +52,7 @@ func main() {
 	svcSize := uint32(10000) // 10K logs per env/svc
 	logStore := store.NewStore(&store.Cfg{
 		RingSizes: map[string]uint32{
-			"/prod/wp":              500000,
+			"/prod/wp":                  500000,
 			"/prod/ticker-service":      svcSize,
 			"/prod/taxonomy-service":    svcSize,
 			"/prod/swiplus-service":     svcSize,
@@ -84,7 +84,6 @@ func main() {
 		ReadSecret:          readSecret,
 		WriteSecret:         writeSecret,
 		LogStore:            logStore,
-		AlarmSvc:            nil,
 		SubRateLimitEvery:   100 * time.Microsecond,
 		SubRateLimitBurst:   50,
 		QueryRateLimitEvery: 20 * time.Millisecond,
@@ -95,7 +94,6 @@ func main() {
 	app.NewApp(&app.Cfg{
 		Ctx:                      ctx,
 		LogStore:                 logStore,
-		AlarmSvc:                 nil,
 		RateLimitEvery:           time.Second,
 		RateLimitBurst:           10,
 		Port:                     appPort,
