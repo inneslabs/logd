@@ -32,7 +32,7 @@ func Load(fname, dir string, cfg *LogdCfg) error {
 	}
 	defer file.Close()
 
-	fmt.Printf("found cfg file \"%s\" in %s, decoding yaml", fname, dir)
+	fmt.Printf("found cfg file \"%s\" in %s, decoding yaml\n", fname, dir)
 
 	dec := yaml.NewDecoder(file)
 	dec.KnownFields(true)
