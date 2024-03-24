@@ -33,7 +33,7 @@ func TestSignAndVerify(t *testing.T) {
 	}
 	valid, err := Verify(sec, unpk)
 	if !valid || err != nil {
-		t.FailNow()
+		t.Fatalf("failed with: %s", err)
 	}
 }
 

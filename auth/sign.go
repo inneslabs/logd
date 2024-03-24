@@ -29,11 +29,10 @@ func Sign(secret, payload []byte, t time.Time) ([]byte, error) {
 	// compute checksum
 	h := sha256.Sum256(data)
 	sum := h[:SumLen]
-	// return sum + time + payload
-	signed := make([]byte, 0, SumLen+TimeLen+len(payload))
-	signed = append(signed, sum...)
-	signed = append(signed, timeBytes...)
-	return append(signed, payload...), nil
+	// append sum and timeBytes to data slice
+	data = append(data[:0], sum...)
+	data = append(data, timeBytes...)
+	return append(data, payload...), nil
 }
 
 func Verify(secret []byte, unpk *Unpacked) (bool, error) {
