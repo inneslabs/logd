@@ -28,9 +28,8 @@ func Sign(secret, payload []byte, t time.Time) ([]byte, error) {
 	data = append(data, payload...)
 	// compute checksum
 	h := sha256.Sum256(data)
-	sum := h[:SumLen]
 	// append sum and timeBytes to data slice
-	data = append(data[:0], sum...)
+	data = append(data[:0], h[:SumLen]...)
 	data = append(data, timeBytes...)
 	return append(data, payload...), nil
 }
