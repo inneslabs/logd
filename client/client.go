@@ -10,20 +10,18 @@ import (
 type Client struct {
 	ctx        context.Context
 	readSecret []byte
-	hostname   string
-	port       int
 	conn       net.Conn
 }
 
 type Cfg struct {
 	Ctx        context.Context
 	ReadSecret string
-	Hostname   string
+	Host       string
 	Port       int
 }
 
 func NewClient(cfg *Cfg) (*Client, error) {
-	addrs, err := net.LookupHost(cfg.Hostname)
+	addrs, err := net.LookupHost(cfg.Host)
 	if err != nil {
 		return nil, fmt.Errorf("err looking up hostname: %w", err)
 	}
@@ -36,8 +34,6 @@ func NewClient(cfg *Cfg) (*Client, error) {
 	return &Client{
 		ctx:        cfg.Ctx,
 		readSecret: []byte(cfg.ReadSecret),
-		hostname:   cfg.Hostname,
-		port:       cfg.Port,
 		conn:       conn,
 	}, nil
 }
