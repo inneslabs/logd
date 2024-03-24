@@ -31,5 +31,9 @@ func Load(fname string, cfg *LogdCfg) error {
 		return fmt.Errorf("err decoding cfg file (%s): %w", fname, err)
 	}
 
+	if cfg.ReadSecret != "" || cfg.WriteSecret != "" {
+		fmt.Println("warning: in production, do not set read_secret or write_secret in the logdrc.yml")
+	}
+
 	return nil
 }

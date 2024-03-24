@@ -7,7 +7,7 @@ import (
 
 const (
 	PingPeriod            = time.Second * 2
-	kickAfterMissingPings = 5
+	kickAfterMissingPings = 3
 )
 
 func (svc *UdpSvc) kickLateSubs() {
@@ -17,7 +17,6 @@ func (svc *UdpSvc) kickLateSubs() {
 			for _, sub := range svc.subs {
 				if sub.lastPing.Before(time.Now().Add(-(PingPeriod * kickAfterMissingPings))) {
 					svc.kickSub(sub)
-					return
 				}
 			}
 		case <-svc.ctx.Done():

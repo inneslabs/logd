@@ -31,6 +31,18 @@ func main() {
 		fmt.Println(err)
 	}
 
+	// env vars overwrite config file
+	readSecret, set := os.LookupEnv("LOGD_READ_SECRET")
+	if set {
+		config.ReadSecret = readSecret
+		fmt.Println("read secret set from env LOGD_READ_SECRET")
+	}
+	writeSecret, set := os.LookupEnv("LOGD_WRITE_SECRET")
+	if set {
+		config.WriteSecret = writeSecret
+		fmt.Println("write secret set from env LOGD_WRITE_SECRET")
+	}
+
 	logStore := store.NewStore(config.Store)
 
 	// print config insensitive config
