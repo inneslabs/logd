@@ -26,7 +26,12 @@ func main() {
 		},
 	}
 
-	err := cfg.Load("logdrc.yml", config)
+	wd, err := os.Getwd()
+	if err != nil {
+		panic(err)
+	}
+
+	err = cfg.Load("logdrc.yml", wd, config)
 	if err != nil {
 		fmt.Println(err)
 	}
