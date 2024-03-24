@@ -180,7 +180,7 @@ func (svc *UdpSvc) writeToSubs() {
 		case protoPair := <-svc.forSubs:
 			svc.subsMu.RLock()
 			for raddr, sub := range svc.subs {
-				if !shouldSendToSub(sub, protoPair) {
+				if !shouldSendToSub(sub, protoPair.Msg) {
 					continue
 				}
 				svc.subRateLimiter.Wait(context.Background())
@@ -197,22 +197,22 @@ func (svc *UdpSvc) writeToSubs() {
 	}
 }
 
-func shouldSendToSub(sub *Sub, protoPair *ProtoPair) bool {
+func shouldSendToSub(sub *Sub, msg *cmd.Msg) bool {
 	if sub.queryParams != nil {
 		keyPrefix := sub.queryParams.GetKeyPrefix()
-		if keyPrefix != "" && strings.HasPrefix(protoPair.Msg.GetKey(), keyPrefix) {
+		if keyPrefix != "" && !strings.HasPrefix(msg.GetKey(), keyPrefix) {
 			return false
 		}
 		qLvl := sub.queryParams.GetLvl()
-		if qLvl != cmd.Lvl_LVL_UNKNOWN && qLvl > protoPair.Msg.GetLvl() {
+		if qLvl != cmd.Lvl_LVL_UNKNOWN && qLvl > msg.GetLvl() {
 			return false
 		}
 		qResponseStatus := sub.queryParams.GetResponseStatus()
-		if qResponseStatus != 0 && qResponseStatus != protoPair.Msg.GetResponseStatus() {
+		if qResponseStatus != 0 && qResponseStatus != msg.GetResponseStatus() {
 			return false
 		}
 		qUrl := sub.queryParams.GetUrl()
-		if qUrl != "" && !strings.HasPrefix(protoPair.Msg.GetUrl(), qUrl) {
+		if qUrl != "" && !strings.HasPrefix(msg.GetUrl(), qUrl) {
 			return false
 		}
 	}
