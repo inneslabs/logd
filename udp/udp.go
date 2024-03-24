@@ -16,7 +16,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const MaxPacketSize = 1920
+const (
+	MaxPacketSize = 1920
+	ReplyKey      = "//logd"
+)
 
 // IMPORTANT:
 // REPLAY VULNERABILITY MUST BE SOLVED,
@@ -218,7 +221,7 @@ func shouldSendToSub(sub *Sub, protoPair *ProtoPair) bool {
 
 func (svc *UdpSvc) reply(txt string, raddr netip.AddrPort) {
 	payload, _ := proto.Marshal(&cmd.Msg{
-		Key: "//logd",
+		Key: ReplyKey,
 		Txt: &txt,
 	})
 	svc.subRateLimiter.Wait(context.Background())
