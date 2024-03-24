@@ -183,7 +183,7 @@ func (svc *UdpSvc) writeToSubs() {
 				if !shouldSendToSub(sub, protoPair.Msg) {
 					continue
 				}
-				svc.subRateLimiter.Wait(context.Background())
+				svc.subRateLimiter.Wait(svc.ctx)
 				_, err := svc.conn.WriteToUDPAddrPort(protoPair.Bytes, sub.raddr)
 				if err != nil {
 					fmt.Printf("write udp err: (%s) %s\n", raddr, err)
@@ -224,6 +224,6 @@ func (svc *UdpSvc) reply(txt string, raddr netip.AddrPort) {
 		Key: ReplyKey,
 		Txt: &txt,
 	})
-	svc.subRateLimiter.Wait(context.Background())
+	svc.subRateLimiter.Wait(svc.ctx)
 	svc.conn.WriteToUDPAddrPort(payload, raddr)
 }

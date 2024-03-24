@@ -64,16 +64,16 @@ func main() {
 		WriteSecret:         config.WriteSecret,
 		LogStore:            logStore,
 		SubRateLimitEvery:   100 * time.Microsecond,
-		SubRateLimitBurst:   50,
-		QueryRateLimitEvery: 20 * time.Millisecond,
-		QueryRateLimitBurst: 10,
+		SubRateLimitBurst:   20,
+		QueryRateLimitEvery: 100 * time.Microsecond,
+		QueryRateLimitBurst: 20,
 	})
 
 	// init app
 	app.NewApp(&app.Cfg{
 		Ctx:                      ctx,
 		LogStore:                 logStore,
-		RateLimitEvery:           time.Second,
+		RateLimitEvery:           500 * time.Millisecond,
 		RateLimitBurst:           10,
 		Port:                     config.AppPort,
 		AccessControlAllowOrigin: config.AccessControlAllowOrigin,
