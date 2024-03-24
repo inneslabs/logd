@@ -59,7 +59,7 @@ func (c *Client) readQueryMsg(buf []byte) (*cmd.Msg, error) {
 	buf = buf[:udp.MaxPacketSize] // re-slice to capacity
 
 	// Set a deadline for the Read operation
-	deadline := time.Now().Add(100 * time.Millisecond)
+	deadline := time.Now().Add(500 * time.Millisecond)
 	if err := c.conn.SetReadDeadline(deadline); err != nil {
 		return nil, err
 	}
