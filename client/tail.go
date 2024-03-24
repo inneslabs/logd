@@ -57,9 +57,10 @@ func (c *Client) readTailMsgs(out chan<- *cmd.Msg) {
 		}
 		if m.Key == udp.ReplyKey {
 			fmt.Print(m.GetTxt())
-		} else {
-			out <- m
+			continue
 		}
+		out <- m
+
 	}
 }
 

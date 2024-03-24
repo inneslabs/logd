@@ -12,7 +12,10 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-const hardLimit = 100000
+const (
+	hardLimit = 100000
+	EndMsg    = "+END"
+)
 
 func (udpSvc *UdpSvc) handleQuery(query *cmd.Cmd, raddr netip.AddrPort, unpk *auth.Unpacked) error {
 	valid, err := auth.Verify(udpSvc.readSecret, unpk)
@@ -45,8 +48,8 @@ func (udpSvc *UdpSvc) handleQuery(query *cmd.Cmd, raddr netip.AddrPort, unpk *au
 		}
 	}
 
-	time.Sleep(time.Millisecond * 50) // ensure +END arrives last
-	udpSvc.reply("+END", raddr)
+	time.Sleep(time.Millisecond * 10) // ensure +END arrives last
+	udpSvc.reply(EndMsg, raddr)
 	return nil
 }
 
