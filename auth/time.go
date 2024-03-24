@@ -1,6 +1,3 @@
-/*
-Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
-*/
 package auth
 
 import (

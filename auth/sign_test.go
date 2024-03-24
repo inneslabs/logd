@@ -1,13 +1,10 @@
-/*
-Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
-*/
 package auth
 
 import (
 	"testing"
 	"time"
 
-	"github.com/intob/logd/cmd"
+	"github.com/inneslabs/logd/cmd"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )

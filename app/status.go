@@ -1,6 +1,3 @@
-/*
-Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
-*/
 package app
 
 import (
@@ -12,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/intob/jfmt"
+	"github.com/inneslabs/jfmt"
 )
 
 type Status struct {

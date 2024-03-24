@@ -6,8 +6,8 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/intob/logd/auth"
-	"github.com/intob/logd/cmd"
+	"github.com/inneslabs/logd/auth"
+	"github.com/inneslabs/logd/cmd"
 )
 
 func (svc *UdpSvc) handleTail(c *cmd.Cmd, raddr netip.AddrPort, unpk *auth.Unpacked) error {

@@ -1,30 +1,26 @@
-/*
-Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
-*/
-package query
+package client
 
 import (
 	"fmt"
-	"net"
 	"time"
 
-	"github.com/intob/logd/auth"
-	"github.com/intob/logd/cmd"
-	"github.com/intob/logd/udp"
+	"github.com/inneslabs/logd/auth"
+	"github.com/inneslabs/logd/cmd"
+	"github.com/inneslabs/logd/udp"
 	"google.golang.org/protobuf/proto"
 )
 
-func Query(q *cmd.QueryParams, conn net.Conn, readSecret []byte) (<-chan *cmd.Msg, error) {
-	err := writeRequest(q, conn, readSecret)
+func (c *Client) Query(q *cmd.QueryParams) (<-chan *cmd.Msg, error) {
+	err := c.writeRequest(q)
 	if err != nil {
 		return nil, err
 	}
 	out := make(chan *cmd.Msg)
-	go readMsgs(conn, out)
+	go c.readQueryMsgs(out)
 	return out, nil
 }
 
-func writeRequest(q *cmd.QueryParams, conn net.Conn, readSecret []byte) error {
+func (c *Client) writeRequest(q *cmd.QueryParams) error {
 	payload, err := proto.Marshal(&cmd.Cmd{
 		Name:        cmd.Name_QUERY,
 		QueryParams: q,
@@ -32,21 +28,21 @@ func writeRequest(q *cmd.QueryParams, conn net.Conn, readSecret []byte) error {
 	if err != nil {
 		return fmt.Errorf("marshal ping msg err: %w", err)
 	}
-	sig, err := auth.Sign(readSecret, payload, time.Now())
+	sig, err := auth.Sign(c.readSecret, payload, time.Now())
 	if err != nil {
 		return fmt.Errorf("sign tail msg err: %w", err)
 	}
-	_, err = conn.Write(sig)
+	_, err = c.conn.Write(sig)
 	if err != nil {
 		return fmt.Errorf("write tail msg err: %w", err)
 	}
 	return nil
 }
 
-func readMsgs(conn net.Conn, out chan<- *cmd.Msg) {
+func (c *Client) readQueryMsgs(out chan<- *cmd.Msg) {
 	buf := make([]byte, udp.MaxPacketSize)
 	for {
-		m, err := readMsg(buf, conn)
+		m, err := c.readQueryMsg(buf)
 		if err != nil {
 			fmt.Println("failed to read msg:", err)
 			continue
@@ -55,9 +51,9 @@ func readMsgs(conn net.Conn, out chan<- *cmd.Msg) {
 	}
 }
 
-func readMsg(buf []byte, conn net.Conn) (*cmd.Msg, error) {
+func (c *Client) readQueryMsg(buf []byte) (*cmd.Msg, error) {
 	buf = buf[:udp.MaxPacketSize] // re-slice to capacity
-	n, err := conn.Read(buf)
+	n, err := c.conn.Read(buf)
 	if err != nil {
 		return nil, err
 	}

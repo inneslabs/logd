@@ -1,6 +1,3 @@
-/*
-Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
-*/
 package app
 
 import (
@@ -11,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/intob/logd/store"
+	"github.com/inneslabs/logd/store"
 	"golang.org/x/time/rate"
 )
 

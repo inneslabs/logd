@@ -1,6 +1,3 @@
-/*
-Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
-*/
 package logger
 
 import (
@@ -10,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/intob/logd/auth"
-	"github.com/intob/logd/cmd"
+	"github.com/inneslabs/logd/auth"
+	"github.com/inneslabs/logd/cmd"
 	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -37,14 +34,8 @@ type LoggerConfig struct {
 	Stdout      bool
 }
 
-// Returns a new logger, defaults to logd.swissinfo.ch:6102
+// Returns a new logger
 func NewLogger(cfg *LoggerConfig) (*Logger, error) {
-	if cfg.Host == "" {
-		cfg.Host = "logd.swissinfo.ch"
-	}
-	if cfg.Port == 0 {
-		cfg.Port = 6102
-	}
 	addrs, err := net.LookupHost(cfg.Host)
 	if err != nil {
 		return nil, err

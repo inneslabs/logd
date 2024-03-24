@@ -1,6 +1,3 @@
-/*
-Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
-*/
 package main
 
 import (
@@ -11,11 +8,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/intob/jfmt"
-	"github.com/intob/logd/app"
-	"github.com/intob/logd/cfg"
-	"github.com/intob/logd/store"
-	"github.com/intob/logd/udp"
+	"github.com/inneslabs/jfmt"
+	"github.com/inneslabs/logd/app"
+	"github.com/inneslabs/logd/cfg"
+	"github.com/inneslabs/logd/store"
+	"github.com/inneslabs/logd/udp"
 )
 
 func main() {

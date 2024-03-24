@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/intob/logd/store"
+	"github.com/inneslabs/logd/store"
 	"gopkg.in/yaml.v3"
 )
 

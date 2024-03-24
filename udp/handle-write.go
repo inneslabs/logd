@@ -1,6 +1,3 @@
-/*
-Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
-*/
 package udp
 
 import (
@@ -8,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/intob/logd/auth"
-	"github.com/intob/logd/cmd"
+	"github.com/inneslabs/logd/auth"
+	"github.com/inneslabs/logd/cmd"
 	"google.golang.org/protobuf/proto"
 )
 

@@ -1,6 +1,3 @@
-/*
-Copyright © 2024 JOSEPH INNES <avianpneuma@gmail.com>
-*/
 package udp
 
 import (
@@ -12,9 +9,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/intob/logd/auth"
-	"github.com/intob/logd/cmd"
-	"github.com/intob/logd/store"
+	"github.com/inneslabs/logd/auth"
+	"github.com/inneslabs/logd/cmd"
+	"github.com/inneslabs/logd/store"
 	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
 )
