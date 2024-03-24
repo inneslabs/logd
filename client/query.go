@@ -40,18 +40,16 @@ func (c *Client) writeRequest(q *cmd.QueryParams) error {
 }
 
 func (c *Client) readQueryMsgs(out chan<- *cmd.Msg) {
+	defer close(out)
 	buf := make([]byte, udp.MaxPacketSize)
 	for {
 		m, err := c.readQueryMsg(buf)
 		if err != nil {
 			fmt.Println("failed to read msg:", err)
-			continue
+			return
 		}
-		if m.GetKey() == udp.ReplyKey {
-			if m.GetTxt() == udp.EndMsg {
-				return
-			}
-			continue
+		if m.GetKey() == udp.ReplyKey && m.GetTxt() == udp.EndMsg {
+			return
 		}
 		out <- m
 	}
@@ -59,10 +57,21 @@ func (c *Client) readQueryMsgs(out chan<- *cmd.Msg) {
 
 func (c *Client) readQueryMsg(buf []byte) (*cmd.Msg, error) {
 	buf = buf[:udp.MaxPacketSize] // re-slice to capacity
+
+	// Set a deadline for the Read operation
+	deadline := time.Now().Add(100 * time.Millisecond)
+	if err := c.conn.SetReadDeadline(deadline); err != nil {
+		return nil, err
+	}
+
 	n, err := c.conn.Read(buf)
 	if err != nil {
 		return nil, err
 	}
+
+	// Clear the deadline
+	c.conn.SetReadDeadline(time.Time{})
+
 	m := &cmd.Msg{}
 	err = proto.Unmarshal(buf[:n], m)
 	if err != nil {

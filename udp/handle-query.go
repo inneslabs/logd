@@ -17,7 +17,7 @@ const (
 	EndMsg    = "+END"
 )
 
-func (udpSvc *UdpSvc) handleQuery(query *cmd.Cmd, raddr netip.AddrPort, unpk *auth.Unpacked) error {
+func (udpSvc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort, unpk *auth.Unpacked) error {
 	valid, err := auth.Verify(udpSvc.readSecret, unpk)
 	if !valid || err != nil {
 		return errors.New("unauthorized")
@@ -25,9 +25,10 @@ func (udpSvc *UdpSvc) handleQuery(query *cmd.Cmd, raddr netip.AddrPort, unpk *au
 
 	udpSvc.queryRateLimiter.Wait(udpSvc.ctx)
 
-	offset := query.GetQueryParams().GetOffset()
-	limit := limit(query.GetQueryParams().GetLimit())
-	keyPrefix := query.GetQueryParams().GetKeyPrefix()
+	query := command.GetQueryParams()
+	offset := query.GetOffset()
+	limit := limit(query.GetLimit())
+	keyPrefix := query.GetKeyPrefix()
 
 	for log := range udpSvc.logStore.Read(keyPrefix, offset, limit) {
 		msg := &cmd.Msg{}
@@ -53,19 +54,19 @@ func (udpSvc *UdpSvc) handleQuery(query *cmd.Cmd, raddr netip.AddrPort, unpk *au
 	return nil
 }
 
-func matchMsg(msg *cmd.Msg, query *cmd.Cmd) bool {
-	keyPrefix := query.GetQueryParams().GetKeyPrefix()
+func matchMsg(msg *cmd.Msg, query *cmd.QueryParams) bool {
+	keyPrefix := query.GetKeyPrefix()
 	if keyPrefix != "" && !strings.HasPrefix(msg.GetKey(), keyPrefix) {
 		return false
 	}
 
-	tStart := tStart(query.GetQueryParams())
-	tEnd := tEnd(query.GetQueryParams())
-	lvl := query.GetQueryParams().GetLvl()
-	txt := query.GetQueryParams().GetTxt()
-	httpMethod := query.GetQueryParams().GetHttpMethod()
-	url := query.GetQueryParams().GetUrl()
-	responseStatus := query.GetQueryParams().GetResponseStatus()
+	tStart := tStart(query)
+	tEnd := tEnd(query)
+	lvl := query.GetLvl()
+	txt := query.GetTxt()
+	httpMethod := query.GetHttpMethod()
+	url := query.GetUrl()
+	responseStatus := query.GetResponseStatus()
 	msgT := msg.T.AsTime()
 
 	if tStart != nil && msgT.Before(*tStart) {
