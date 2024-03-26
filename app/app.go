@@ -8,18 +8,18 @@ import (
 	"sync"
 	"time"
 
+	"github.com/inneslabs/logd/cfg"
 	"github.com/inneslabs/logd/store"
 	"golang.org/x/time/rate"
 )
 
 type App struct {
 	// cfg
-	ctx                      context.Context
-	port                     int
-	logStore                 *store.Store
-	rateLimitEvery           time.Duration
-	rateLimitBurst           int
-	accessControlAllowOrigin string
+	ctx            context.Context
+	settings       *cfg.AppSettings
+	logStore       *store.Store
+	rateLimitEvery time.Duration
+	rateLimitBurst int
 	// state
 	commit     string
 	started    time.Time
@@ -29,12 +29,11 @@ type App struct {
 }
 
 type Cfg struct {
-	Ctx                      context.Context
-	Port                     int
-	LogStore                 *store.Store
-	RateLimitEvery           time.Duration
-	RateLimitBurst           int
-	AccessControlAllowOrigin string
+	Ctx            context.Context
+	Settings       *cfg.AppSettings
+	LogStore       *store.Store
+	RateLimitEvery time.Duration
+	RateLimitBurst int
 }
 
 type client struct {
@@ -50,12 +49,11 @@ func NewApp(cfg *Cfg) *App {
 	}
 	app := &App{
 		// cfg
-		ctx:                      cfg.Ctx,
-		port:                     cfg.Port,
-		logStore:                 cfg.LogStore,
-		rateLimitEvery:           cfg.RateLimitEvery,
-		rateLimitBurst:           cfg.RateLimitBurst,
-		accessControlAllowOrigin: cfg.AccessControlAllowOrigin,
+		ctx:            cfg.Ctx,
+		settings:       cfg.Settings,
+		logStore:       cfg.LogStore,
+		rateLimitEvery: cfg.RateLimitEvery,
+		rateLimitBurst: cfg.RateLimitBurst,
 		// state
 		started: time.Now(),
 		commit:  string(commit),
@@ -72,11 +70,17 @@ func (app *App) serve() {
 	mux.Handle("/", app.rateLimitMiddleware(
 		app.corsMiddleware(
 			http.HandlerFunc(app.handleRequest))))
-	laddr := fmt.Sprintf(":%d", app.port)
-	fmt.Println("app listening http on", laddr)
-	server := &http.Server{Addr: laddr, Handler: mux}
+	fmt.Println("app listening http on", app.settings.LaddrPort)
+	server := &http.Server{Addr: app.settings.LaddrPort, Handler: mux}
 	go func() {
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if app.settings.TLSCertFname != "" {
+			err := server.ListenAndServeTLS(app.settings.TLSCertFname, app.settings.TLSKeyFname)
+			if err != nil && err != http.ErrServerClosed {
+				panic(fmt.Sprintf("failed to listen https: %v\n", err))
+			}
+		}
+		err := server.ListenAndServe()
+		if err != nil && err != http.ErrServerClosed {
 			panic(fmt.Sprintf("failed to listen http: %v\n", err))
 		}
 	}()
@@ -94,8 +98,7 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", app.accessControlAllowOrigin)
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Fly-Client-IP")
+		w.Header().Set("Access-Control-Allow-Origin", app.settings.AccessControlAllowOrigin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET")
 		next.ServeHTTP(w, r)
 	})
@@ -117,13 +120,9 @@ func (app *App) rateLimitMiddleware(next http.Handler) http.Handler {
 
 // getRateLimiter returns a rate limiter for the given request.
 func (app *App) getRateLimiter(r *http.Request) *rate.Limiter {
-	addr := r.Header.Get("Fly-Client-IP")
-	if addr == "" {
-		addr = r.RemoteAddr // fallback when local
-	}
 	app.clientMu.Lock()
 	defer app.clientMu.Unlock()
-	key := r.Method + addr
+	key := r.Method + r.RemoteAddr
 	v, exists := app.clients[key]
 	if !exists {
 		limiter := rate.NewLimiter(rate.Every(app.rateLimitEvery), app.rateLimitBurst)

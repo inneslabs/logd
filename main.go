@@ -8,7 +8,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/inneslabs/jfmt"
 	"github.com/inneslabs/logd/app"
 	"github.com/inneslabs/logd/cfg"
 	"github.com/inneslabs/logd/store"
@@ -18,9 +17,11 @@ import (
 func main() {
 	// defaults
 	config := &cfg.LogdCfg{
-		UdpLaddrPort:             ":6102",
-		AppPort:                  6101,
-		AccessControlAllowOrigin: "*",
+		UdpLaddrPort: ":6102",
+		AppSettings: &cfg.AppSettings{
+			LaddrPort:                ":6101",
+			AccessControlAllowOrigin: "*",
+		},
 		Store: &store.Cfg{
 			FallbackSize: 100000,
 		},
@@ -50,14 +51,6 @@ func main() {
 
 	logStore := store.NewStore(config.Store)
 
-	// print config insensitive config
-	fmt.Println("udp port set to", config.UdpLaddrPort)
-	fmt.Println("app port set to", config.AppPort)
-	fmt.Println("access-control-allow-origin set to", config.AccessControlAllowOrigin)
-	for key, size := range logStore.Sizes() {
-		fmt.Printf("%s: %s\n", key, jfmt.FmtCount32(size))
-	}
-
 	// init root context
 	ctx := getCtx()
 
@@ -76,12 +69,11 @@ func main() {
 
 	// init app
 	app.NewApp(&app.Cfg{
-		Ctx:                      ctx,
-		LogStore:                 logStore,
-		RateLimitEvery:           500 * time.Millisecond,
-		RateLimitBurst:           10,
-		Port:                     config.AppPort,
-		AccessControlAllowOrigin: config.AccessControlAllowOrigin,
+		Ctx:            ctx,
+		Settings:       config.AppSettings,
+		LogStore:       logStore,
+		RateLimitEvery: 500 * time.Millisecond,
+		RateLimitBurst: 10,
 	})
 
 	// wait for kill signal
