@@ -46,9 +46,9 @@ func Load(fname, dir string, cfg *LogdCfg) error {
 		return fmt.Errorf("err decoding cfg file (%s): %w", fname, err)
 	}
 
-	fmt.Println(cfg)
-	fmt.Println(cfg.AppSettings)
-	fmt.Println(cfg.Store)
+	fmt.Printf("%+v\n", cfg)
+	fmt.Printf("%+v\n", cfg.AppSettings)
+	fmt.Printf("%+v\n", cfg.Store)
 
 	return nil
 }

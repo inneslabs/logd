@@ -70,15 +70,16 @@ func (app *App) serve() {
 	mux.Handle("/", app.rateLimitMiddleware(
 		app.corsMiddleware(
 			http.HandlerFunc(app.handleRequest))))
-	fmt.Println("app listening http on", app.settings.LaddrPort)
 	server := &http.Server{Addr: app.settings.LaddrPort, Handler: mux}
 	go func() {
 		if app.settings.TLSCertFname != "" {
+			fmt.Println("app listening https on", app.settings.LaddrPort)
 			err := server.ListenAndServeTLS(app.settings.TLSCertFname, app.settings.TLSKeyFname)
 			if err != nil && err != http.ErrServerClosed {
 				panic(fmt.Sprintf("failed to listen https: %v\n", err))
 			}
 		}
+		fmt.Println("app listening http on", app.settings.LaddrPort)
 		err := server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			panic(fmt.Sprintf("failed to listen http: %v\n", err))
