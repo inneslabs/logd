@@ -16,7 +16,7 @@ import (
 type App struct {
 	// cfg
 	ctx            context.Context
-	settings       *cfg.AppSettings
+	settings       cfg.AppSettings
 	logStore       *store.Store
 	rateLimitEvery time.Duration
 	rateLimitBurst int
@@ -50,7 +50,7 @@ func NewApp(cfg *Cfg) *App {
 	app := &App{
 		// cfg
 		ctx:            cfg.Ctx,
-		settings:       cfg.Settings,
+		settings:       *cfg.Settings,
 		logStore:       cfg.LogStore,
 		rateLimitEvery: cfg.RateLimitEvery,
 		rateLimitBurst: cfg.RateLimitBurst,
