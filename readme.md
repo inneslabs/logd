@@ -11,17 +11,6 @@ Logd will never run out of memory if the buffer sizes are ok for the provisioned
 The buffer uses a single moving pointer, `head`. Each write advances the pointer forward. Reading is normally back from `head`. **No mutex**, `head` is an `atomic.Uint32`. This is a key reason for the performance of the ring buffer.
 
 # To Do
-## Mmove to AWS, or bridge WireGuard PN with VPC.
-I want to applications to write directly to Logd. This will give us **REALTIME** log data. Some apps run in the VPC. I also want to put logd in the PN, and expose only the HTTP endpoint externally (only status). Authenticated RPCs are already **ONLY OVER UDP**.
-
-### 2024-03-07 Decision to move to AWS.
-See (./doc/bridge-fly-aws.md)[bridging fly with aws].
-This would involve either configuring WireGuard on an EC2 instance, or configuring a VPN Gateway service from AWS.
-
-The added complexity & therefore caution required currently seems to outweight the advantage of running apps on fly.
-
-Therefore, I will migrate logd & zoe to EC2 instances. We can then benefit from the simplicity of running logged in the private network, and exposing only the http port for the status json externally.
-
 ## Fix replay-attack vulnerability
 Note: If we run logd in the private network, this is absolutely no issue, but would be nice to implement for sake of correctness.
 
@@ -29,10 +18,9 @@ There is currently no cache of UDP packet hashes, so we can't yet detect & drop 
 `Estimated time: 2 hours`
 
 ## Automate secret rotation
-Note: Easier on EC2. See Move to AWS.
-Once the Secrets Manager Rotation topic is in production, we can integrate this.
-There is one consideration. We will need to periodically read the env var so that we can update this during runtime, without need to restart the application.
+Note: Now easier on EC2. I still need to get SecretsManagerRotation v0.2.0 into prod.
 **Maybe it is no-longer necessary to store this secret in the SOPS file.**
+We could just deploy the secret everywhere at the same time without it being available to read anywhere.
 `Estimated time: 4 hours`
 
 # Auth
