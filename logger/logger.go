@@ -23,19 +23,17 @@ type Logger struct {
 	stdout      bool
 }
 
-type LoggerConfig struct {
-	Ctx         context.Context
-	Host        string
-	Port        int
-	WriteSecret string
-	Env         string
-	Svc         string
-	Fn          string
-	Stdout      bool
+type LoggerCfg struct {
+	Host        string `yaml:"host"`
+	Port        int    `yaml:"port"`
+	WriteSecret string `yaml:"write_secret"`
+	Env         string `yaml:"env"`
+	Svc         string `yaml:"svc"`
+	Fn          string `yaml:"fn"`
+	Stdout      bool   `yaml:"stdout"`
 }
 
-// Returns a new logger
-func NewLogger(cfg *LoggerConfig) (*Logger, error) {
+func NewLogger(ctx context.Context, cfg *LoggerCfg) (*Logger, error) {
 	addrs, err := net.LookupHost(cfg.Host)
 	if err != nil {
 		return nil, err
@@ -45,7 +43,7 @@ func NewLogger(cfg *LoggerConfig) (*Logger, error) {
 		return nil, err
 	}
 	return &Logger{
-		ctx:         cfg.Ctx,
+		ctx:         ctx,
 		conn:        conn,
 		rateLimiter: rate.NewLimiter(rate.Every(time.Microsecond*250), 20),
 		secret:      []byte(cfg.WriteSecret),
@@ -54,7 +52,6 @@ func NewLogger(cfg *LoggerConfig) (*Logger, error) {
 	}, nil
 }
 
-// Log writes a msg to Logger socket
 func (l *Logger) Log(lvl *cmd.Lvl, template string, args ...interface{}) {
 	txt := fmt.Sprintf(template, args...)
 	payload, _ := proto.Marshal(&cmd.Msg{
