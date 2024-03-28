@@ -19,7 +19,7 @@ type Logger struct {
 	conn        net.Conn
 	rateLimiter *rate.Limiter
 	secret      []byte
-	key         string
+	msgKey      string
 	stdout      bool
 }
 
@@ -27,9 +27,7 @@ type LoggerCfg struct {
 	Host        string `yaml:"host"`
 	Port        int    `yaml:"port"`
 	WriteSecret string `yaml:"write_secret"`
-	Env         string `yaml:"env"`
-	Svc         string `yaml:"svc"`
-	Fn          string `yaml:"fn"`
+	MsgKey      string `yaml:"msg_key"`
 	Stdout      bool   `yaml:"stdout"`
 }
 
@@ -47,7 +45,7 @@ func NewLogger(ctx context.Context, cfg *LoggerCfg) (*Logger, error) {
 		conn:        conn,
 		rateLimiter: rate.NewLimiter(rate.Every(time.Microsecond*250), 20),
 		secret:      []byte(cfg.WriteSecret),
-		key:         fmt.Sprintf("/%s/%s/%s", cfg.Env, cfg.Svc, cfg.Fn),
+		msgKey:      cfg.MsgKey,
 		stdout:      cfg.Stdout,
 	}, nil
 }
@@ -56,7 +54,7 @@ func (l *Logger) Log(lvl *cmd.Lvl, template string, args ...interface{}) {
 	txt := fmt.Sprintf(template, args...)
 	payload, _ := proto.Marshal(&cmd.Msg{
 		T:   timestamppb.Now(),
-		Key: l.key,
+		Key: l.msgKey,
 		Lvl: lvl,
 		Txt: &txt,
 	})
