@@ -6,14 +6,8 @@ It must also
 
 # To Do
 ## Fix replay-attack vulnerability
-There is currently no cache of UDP packet hashes, so we can't yet detect & drop a replay. A small ring buffer would probably be ideal for this.
+There is currently no cache of UDP packet hashes, so we can't yet detect & drop a replay. A small ring buffer would be ideal for this.
 `Estimated time: 2 hours`
-
-## Automate secret rotation
-Note: Now easier on EC2. I still need to get SecretsManagerRotation v0.2.0 into prod.
-**Maybe it is no-longer necessary to store this secret in the SOPS file.**
-We could just deploy the secret everywhere at the same time without it being available to read anywhere.
-`Estimated time: 4 hours`
 
 # Auth
 Logd authenticates clients for either reading or writing using SHA256 hash-based message authentication.
