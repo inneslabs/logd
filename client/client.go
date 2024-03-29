@@ -18,13 +18,23 @@ type Cfg struct {
 }
 
 func NewClient(cfg *Cfg) (*Client, error) {
-	addrs, err := net.LookupHost(cfg.Host)
-	if err != nil {
-		return nil, fmt.Errorf("err looking up hostname: %w", err)
+	var ip string
+	if parsed := net.ParseIP(cfg.Host); parsed != nil {
+		ip = fmt.Sprintf("[%s]", parsed.String())
+	} else {
+		addrs, err := net.LookupHost(cfg.Host)
+		if err != nil {
+			return nil, fmt.Errorf("error looking up hostname: %w", err)
+		}
+		if len(addrs) == 0 {
+			return nil, fmt.Errorf("no addresses found for hostname: %s", cfg.Host)
+		}
+		ip = addrs[0]
 	}
-	conn, err := net.Dial("udp", addrs[0]+":"+strconv.Itoa(cfg.Port))
+	address := net.JoinHostPort(ip, strconv.Itoa(cfg.Port))
+	conn, err := net.Dial("udp", address)
 	if err != nil {
-		return nil, fmt.Errorf("err dialing: %w", err)
+		return nil, fmt.Errorf("error dialing: %w", err)
 	}
 	return &Client{[]byte(cfg.ReadSecret), conn}, nil
 }
