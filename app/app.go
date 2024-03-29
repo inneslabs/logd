@@ -8,18 +8,20 @@ import (
 	"sync"
 	"time"
 
-	"github.com/inneslabs/logd/cfg"
 	"github.com/inneslabs/logd/store"
 	"golang.org/x/time/rate"
 )
 
 type App struct {
 	// cfg
-	ctx            context.Context
-	settings       *cfg.AppSettings
-	logStore       *store.Store
-	rateLimitEvery time.Duration
-	rateLimitBurst int
+	ctx                      context.Context
+	logStore                 *store.Store
+	rateLimitEvery           time.Duration
+	rateLimitBurst           int
+	laddrPort                string
+	tlsCertFname             string
+	tlsKeyFname              string
+	accessControlAllowOrigin string
 	// state
 	commit     string
 	started    time.Time
@@ -29,11 +31,14 @@ type App struct {
 }
 
 type Cfg struct {
-	Ctx            context.Context
-	Settings       *cfg.AppSettings
-	LogStore       *store.Store
-	RateLimitEvery time.Duration
-	RateLimitBurst int
+	Ctx                      context.Context
+	LogStore                 *store.Store
+	LaddrPort                string        `yaml:"laddr_port"`
+	RateLimitEvery           time.Duration `yaml:"rate_limit_every"`
+	RateLimitBurst           int           `yaml:"rate_limit_burst"`
+	TLSCertFname             string        `yaml:"tls_cert_fname"`
+	TLSKeyFname              string        `yaml:"tls_key_fname"`
+	AccessControlAllowOrigin string        `yaml:"access_control_allow_origin"`
 }
 
 type client struct {
@@ -42,7 +47,6 @@ type client struct {
 }
 
 func NewApp(cfg *Cfg) *App {
-	// read commit file
 	commit, err := os.ReadFile("commit")
 	if err != nil {
 		fmt.Println("failed to read commit file:", err)
@@ -50,10 +54,12 @@ func NewApp(cfg *Cfg) *App {
 	app := &App{
 		// cfg
 		ctx:            cfg.Ctx,
-		settings:       cfg.Settings,
 		logStore:       cfg.LogStore,
 		rateLimitEvery: cfg.RateLimitEvery,
 		rateLimitBurst: cfg.RateLimitBurst,
+		laddrPort:      cfg.LaddrPort,
+		tlsCertFname:   cfg.TLSCertFname,
+		tlsKeyFname:    cfg.TLSKeyFname,
 		// state
 		started: time.Now(),
 		commit:  string(commit),
@@ -70,16 +76,16 @@ func (app *App) serve() {
 	mux.Handle("/", app.rateLimitMiddleware(
 		app.corsMiddleware(
 			http.HandlerFunc(app.handleRequest))))
-	server := &http.Server{Addr: app.settings.LaddrPort, Handler: mux}
+	server := &http.Server{Addr: app.laddrPort, Handler: mux}
 	go func() {
-		if app.settings.TLSCertFname != "" {
-			fmt.Println("app listening https on", app.settings.LaddrPort)
-			err := server.ListenAndServeTLS(app.settings.TLSCertFname, app.settings.TLSKeyFname)
+		if app.tlsCertFname != "" {
+			fmt.Println("app listening https on", app.laddrPort)
+			err := server.ListenAndServeTLS(app.tlsCertFname, app.tlsKeyFname)
 			if err != nil && err != http.ErrServerClosed {
 				panic(fmt.Sprintf("failed to listen https: %v\n", err))
 			}
 		}
-		fmt.Println("app listening http on", app.settings.LaddrPort)
+		fmt.Println("app listening http on", app.laddrPort)
 		err := server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			panic(fmt.Sprintf("failed to listen http: %v\n", err))
@@ -99,7 +105,7 @@ func (app *App) handleRequest(w http.ResponseWriter, r *http.Request) {
 
 func (app *App) corsMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Access-Control-Allow-Origin", app.settings.AccessControlAllowOrigin)
+		w.Header().Set("Access-Control-Allow-Origin", app.accessControlAllowOrigin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET")
 		next.ServeHTTP(w, r)
 	})

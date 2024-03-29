@@ -42,14 +42,14 @@ type UdpSvc struct {
 
 type Cfg struct {
 	Ctx                 context.Context
-	LaddrPort           string
-	ReadSecret          string
-	WriteSecret         string
 	LogStore            *store.Store
-	SubRateLimitEvery   time.Duration
-	SubRateLimitBurst   int
-	QueryRateLimitEvery time.Duration
-	QueryRateLimitBurst int
+	LaddrPort           string        `yaml:"laddr_port"`
+	ReadSecret          string        `yaml:"read_secret"`
+	WriteSecret         string        `yaml:"write_secret"`
+	SubRateLimitEvery   time.Duration `yaml:"sub_rate_limit_every"`
+	SubRateLimitBurst   int           `yaml:"sub_rate_limit_burst"`
+	QueryRateLimitEvery time.Duration `yaml:"query_rate_limit_every"`
+	QueryRateLimitBurst int           `yaml:"query_rate_limit_burst"`
 }
 
 type Sub struct {
