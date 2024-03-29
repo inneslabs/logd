@@ -2,7 +2,9 @@
 A simple protocol for log data, built on Protobuf, SHA256, and UDP.
 Currently, there is only a map of ring buffers in memory.
 This program does not yet write log data to a file, although this is clearly an important feature to come.
-It must also 
+```bash
+go run .
+```
 
 # To Do
 ## Fix replay-attack vulnerability
