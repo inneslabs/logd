@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/inneslabs/fnpool"
 	"github.com/inneslabs/logd/auth"
 	"github.com/inneslabs/logd/cmd"
 	"github.com/inneslabs/logd/store"
@@ -38,11 +39,13 @@ type UdpSvc struct {
 	writeSecret      []byte
 	logStore         *store.Store
 	unpkPool         *sync.Pool
+	packetWorkerPool *fnpool.Pool
 }
 
 type Cfg struct {
 	Ctx                 context.Context
 	LogStore            *store.Store
+	WorkerPoolSize      int           `yaml:"worker_pool_size"`
 	LaddrPort           string        `yaml:"laddr_port"`
 	ReadSecret          string        `yaml:"read_secret"`
 	WriteSecret         string        `yaml:"write_secret"`
@@ -90,6 +93,7 @@ func NewSvc(cfg *Cfg) *UdpSvc {
 				}
 			},
 		},
+		packetWorkerPool: fnpool.NewPool(cfg.WorkerPoolSize),
 	}
 	go svc.listen()
 	// one gopher kicks subs that don't ping
@@ -109,69 +113,59 @@ func (svc *UdpSvc) listen() {
 		panic(fmt.Errorf("listen udp err: %w", err))
 	}
 	defer svc.conn.Close()
-	fmt.Println("listening udp on", svc.conn.LocalAddr())
-
-	// one gopher reads packets
-	packets := make(chan *Packet, 10)
 	go func() {
-		fmt.Printf("packet-reading gopher started\n")
 		for {
-			svc.readPacket(packets)
+			svc.readPacket()
 		}
 	}()
-
-	// gophers handle packets
-	for i := 0; i < 4; i++ {
-		go func(i int) {
-			fmt.Printf("packet-handling gopher %d started\n", i)
-			for {
-				svc.handlePacket(<-packets)
-			}
-		}(i)
-	}
-
-	// wait for the gopher party to end
+	fmt.Println("listening udp on", svc.conn.LocalAddr())
 	<-svc.ctx.Done()
-	fmt.Println("stopped listening udp")
+	fmt.Println("packet handler pool stopping...")
+	svc.packetWorkerPool.StopAndWait()
+	fmt.Println("packet handler pool stopped")
+	fmt.Println("udp svc shutdown")
 }
 
-func (svc *UdpSvc) readPacket(packets chan<- *Packet) {
+func (svc *UdpSvc) readPacket() {
 	buf := make([]byte, MaxPacketSize)
 	n, raddr, err := svc.conn.ReadFromUDPAddrPort(buf)
 	if err != nil {
+		// todo: handle this
 		return
 	}
-	packets <- &Packet{
+	svc.handlePacket(&Packet{
 		Data:  buf[:n],
 		Raddr: raddr,
-	}
+	})
 }
 
 func (svc *UdpSvc) handlePacket(packet *Packet) {
-	// get a *Unpacked from pool
-	unpk, _ := svc.unpkPool.Get().(*auth.Unpacked)
-	err := auth.UnpackSignedData(packet.Data, unpk)
-	if err != nil {
-		return
-	}
-	c := &cmd.Cmd{}
-	err = proto.Unmarshal(unpk.Payload, c)
-	if err != nil {
-		return
-	}
-	// ignore errors
-	switch c.GetName() {
-	case cmd.Name_WRITE:
-		svc.handleWrite(c, unpk)
-	case cmd.Name_TAIL:
-		svc.handleTail(c, packet.Raddr, unpk)
-	case cmd.Name_PING:
-		svc.handlePing(packet.Raddr, unpk)
-	case cmd.Name_QUERY:
-		svc.handleQuery(c, packet.Raddr, unpk)
-	}
-	// return *Unpacked to pool
-	svc.unpkPool.Put(unpk)
+	svc.packetWorkerPool.Dispatch(func() {
+		// get a *Unpacked from pool
+		unpk, _ := svc.unpkPool.Get().(*auth.Unpacked)
+		err := auth.UnpackSignedData(packet.Data, unpk)
+		if err != nil {
+			return
+		}
+		c := &cmd.Cmd{}
+		err = proto.Unmarshal(unpk.Payload, c)
+		if err != nil {
+			return
+		}
+		// ignore errors
+		switch c.GetName() {
+		case cmd.Name_WRITE:
+			svc.handleWrite(c, unpk)
+		case cmd.Name_TAIL:
+			svc.handleTail(c, packet.Raddr, unpk)
+		case cmd.Name_PING:
+			svc.handlePing(packet.Raddr, unpk)
+		case cmd.Name_QUERY:
+			svc.handleQuery(c, packet.Raddr, unpk)
+		}
+		// return *Unpacked to pool
+		svc.unpkPool.Put(unpk)
+	})
 }
 
 func (svc *UdpSvc) writeToSubs() {

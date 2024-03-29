@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -33,6 +34,7 @@ func main() {
 	config := &Cfg{
 		Udp: &udp.Cfg{
 			Ctx:                 ctx,
+			WorkerPoolSize:      runtime.NumCPU(),
 			LaddrPort:           ":6102",
 			ReadSecret:          "gold",
 			WriteSecret:         "bitcoin",
