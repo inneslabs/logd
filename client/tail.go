@@ -1,44 +1,35 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"time"
 
-	"github.com/inneslabs/logd/auth"
 	"github.com/inneslabs/logd/cmd"
 	"github.com/inneslabs/logd/udp"
 	"google.golang.org/protobuf/proto"
 )
 
-func (c *Client) Tail(q *cmd.QueryParams) (<-chan *cmd.Msg, error) {
-	err := c.sendTailCmd(q)
+func (c *Client) Tail(ctx context.Context, q *cmd.QueryParams, secret []byte) (<-chan *cmd.Msg, error) {
+	err := c.Cmd(ctx, &cmd.Cmd{
+		Name:        cmd.Name_TAIL,
+		QueryParams: q,
+	}, secret)
 	if err != nil {
-		return nil, fmt.Errorf("send tail cmd err: %w", err)
+		return nil, fmt.Errorf("err sending tail cmd: %w", err)
 	}
 	fmt.Printf("\rsent tail cmd\033[0K")
 	out := make(chan *cmd.Msg)
 	go c.readTailMsgs(out)
-	go c.ping()
+	go func() {
+		for {
+			time.Sleep(udp.PingPeriod)
+			c.Cmd(ctx, &cmd.Cmd{
+				Name: cmd.Name_PING,
+			}, secret)
+		}
+	}()
 	return out, nil
-}
-
-func (c *Client) sendTailCmd(q *cmd.QueryParams) error {
-	payload, err := proto.Marshal(&cmd.Cmd{
-		Name:        cmd.Name_TAIL,
-		QueryParams: q,
-	})
-	if err != nil {
-		return fmt.Errorf("marshal ping msg err: %w", err)
-	}
-	sig, err := auth.Sign(c.readSecret, payload, time.Now())
-	if err != nil {
-		return fmt.Errorf("sign tail msg err: %w", err)
-	}
-	_, err = c.conn.Write(sig)
-	if err != nil {
-		return fmt.Errorf("write tail msg err: %w", err)
-	}
-	return nil
 }
 
 func (c *Client) readTailMsgs(out chan<- *cmd.Msg) {
@@ -60,28 +51,5 @@ func (c *Client) readTailMsgs(out chan<- *cmd.Msg) {
 			continue
 		}
 		out <- m
-
-	}
-}
-
-func (c *Client) ping() {
-	for {
-		time.Sleep(udp.PingPeriod)
-		payload, err := proto.Marshal(&cmd.Cmd{
-			Name: cmd.Name_PING,
-		})
-		if err != nil {
-			fmt.Println("marshal ping msg err:", err)
-			continue
-		}
-		sig, err := auth.Sign(c.readSecret, payload, time.Now())
-		if err != nil {
-			fmt.Println("sign ping msg err:", err)
-			continue
-		}
-		_, err = c.conn.Write(sig)
-		if err != nil {
-			fmt.Println("write ping msg err:", err)
-		}
 	}
 }

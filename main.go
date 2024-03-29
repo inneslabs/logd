@@ -65,7 +65,10 @@ func main() {
 		panic(err)
 	}
 
-	fmt.Printf("🌱 running: %+v\n", config)
+	fmt.Println("🌱 running")
+	fmt.Printf("udp: %+v\n", config.Udp)
+	fmt.Printf("app: %+v\n", config.App)
+	fmt.Printf("store: %+v\n", config.Store)
 
 	// secret env vars take precedent
 	readSecretEnv, set := os.LookupEnv("LOGD_READ_SECRET")

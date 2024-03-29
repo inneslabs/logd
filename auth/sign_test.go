@@ -22,7 +22,7 @@ func TestSignAndVerify(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	signed, err := Sign(sec, payload, time.Now())
+	signed, err := SignWithTime(sec, payload, time.Now().Add(SigTtl))
 	if err != nil {
 		t.FailNow()
 	}
@@ -50,7 +50,7 @@ func TestSignAndVerifyInvalid(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	signed, err := Sign(sec, payload, time.Now().Add(time.Second))
+	signed, err := SignWithTime(sec, payload, time.Now().Add(time.Second))
 	if err != nil {
 		t.FailNow()
 	}
@@ -66,8 +66,8 @@ func TestSignAndVerifyInvalid(t *testing.T) {
 }
 
 func BenchmarkSign(b *testing.B) {
-	sec := []byte("testsecret")
-	txt := "this is a test"
+	secret := []byte("testsecret")
+	txt := "test"
 	payload, err := proto.Marshal(&cmd.Cmd{
 		Name: cmd.Name_WRITE,
 		Msg: &cmd.Msg{
@@ -80,13 +80,13 @@ func BenchmarkSign(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Sign(sec, payload, time.Now().Add(time.Second))
+		Sign(secret, payload)
 	}
 }
 
 func BenchmarkVerify(b *testing.B) {
-	sec := []byte("testsecret")
-	txt := "this is a test"
+	secret := []byte("testsecret")
+	txt := "test"
 	payload, err := proto.Marshal(&cmd.Cmd{
 		Name: cmd.Name_WRITE,
 		Msg: &cmd.Msg{
@@ -97,7 +97,7 @@ func BenchmarkVerify(b *testing.B) {
 	if err != nil {
 		b.FailNow()
 	}
-	signed, err := Sign(sec, payload, time.Now().Add(time.Second))
+	signed, err := Sign(secret, payload)
 	if err != nil {
 		b.FailNow()
 	}
@@ -108,6 +108,6 @@ func BenchmarkVerify(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Verify(sec, unpk)
+		Verify(secret, unpk)
 	}
 }

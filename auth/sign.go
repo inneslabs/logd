@@ -9,12 +9,19 @@ import (
 )
 
 const (
-	sigTtl  = time.Millisecond * 100
+	SigTtl  = time.Millisecond * 100
 	SumLen  = 32
 	TimeLen = 8
 )
 
-func Sign(secret, payload []byte, t time.Time) ([]byte, error) {
+// Sign payload using current time + sig ttl
+func Sign(secret, payload []byte) ([]byte, error) {
+	t := time.Now().Add(SigTtl)
+	return SignWithTime(secret, payload, t)
+}
+
+// Sign payload with given time
+func SignWithTime(secret, payload []byte, t time.Time) ([]byte, error) {
 	timeBytes, err := convertTimeToBytes(t)
 	if err != nil {
 		return nil, fmt.Errorf("convert time to bytes err: %w", err)
@@ -34,6 +41,7 @@ func Sign(secret, payload []byte, t time.Time) ([]byte, error) {
 	return append(data, payload...), nil
 }
 
+// Verify signed payload
 func Verify(secret []byte, unpk *Unpacked) (bool, error) {
 	// if secret is unset, return true immediately
 	if len(secret) == 0 {
@@ -45,8 +53,8 @@ func Verify(secret []byte, unpk *Unpacked) (bool, error) {
 		return false, fmt.Errorf("convert bytes to time err: %w", err)
 	}
 	// verify timestamp is within threshold
-	if t.After(time.Now().Add(sigTtl)) ||
-		t.Before(time.Now().Add(-sigTtl)) {
+	if t.After(time.Now().Add(SigTtl)) ||
+		t.Before(time.Now().Add(-SigTtl)) {
 		return false, errors.New("time is outside of threshold")
 	}
 	// pre-allocate slice

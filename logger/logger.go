@@ -3,64 +3,52 @@ package logger
 import (
 	"context"
 	"fmt"
-	"net"
-	"strconv"
-	"time"
 
-	"github.com/inneslabs/logd/auth"
+	"github.com/inneslabs/logd/client"
 	"github.com/inneslabs/logd/cmd"
-	"golang.org/x/time/rate"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 type Logger struct {
-	ctx         context.Context
-	conn        net.Conn
-	rateLimiter *rate.Limiter
-	secret      []byte
-	msgKey      string
-	stdout      bool
+	ctx    context.Context
+	client *client.Client
+	secret []byte
+	msgKey string
+	stdout bool
 }
 
 type LoggerCfg struct {
-	Host   string `yaml:"host"`
-	Port   int    `yaml:"port"`
-	Secret string `yaml:"secret"`
-	MsgKey string `yaml:"msg_key"`
-	Stdout bool   `yaml:"stdout"`
+	Client *client.Cfg `yaml:"client"`
+	Secret string      `yaml:"secret"`
+	MsgKey string      `yaml:"msg_key"`
+	Stdout bool        `yaml:"stdout"`
 }
 
 func NewLogger(ctx context.Context, cfg *LoggerCfg) (*Logger, error) {
-	addrs, err := net.LookupHost(cfg.Host)
+	client, err := client.NewClient(cfg.Client)
 	if err != nil {
-		return nil, err
-	}
-	conn, err := net.Dial("udp", addrs[0]+":"+strconv.Itoa(cfg.Port))
-	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("err initializing client: %w", err)
 	}
 	return &Logger{
-		ctx:         ctx,
-		conn:        conn,
-		rateLimiter: rate.NewLimiter(rate.Every(time.Microsecond*250), 20),
-		secret:      []byte(cfg.Secret),
-		msgKey:      cfg.MsgKey,
-		stdout:      cfg.Stdout,
+		ctx:    ctx,
+		client: client,
+		secret: []byte(cfg.Secret),
+		msgKey: cfg.MsgKey,
+		stdout: cfg.Stdout,
 	}, nil
 }
 
 func (l *Logger) Log(lvl *cmd.Lvl, template string, args ...interface{}) {
 	txt := fmt.Sprintf(template, args...)
-	payload, _ := proto.Marshal(&cmd.Msg{
-		T:   timestamppb.Now(),
-		Key: l.msgKey,
-		Lvl: lvl,
-		Txt: &txt,
-	})
-	signedMsg, _ := auth.Sign(l.secret, payload, time.Now())
-	l.rateLimiter.Wait(l.ctx)
-	l.conn.Write(signedMsg)
+	l.client.Cmd(l.ctx, &cmd.Cmd{
+		Name: cmd.Name_WRITE,
+		Msg: &cmd.Msg{
+			T:   timestamppb.Now(),
+			Key: l.msgKey,
+			Lvl: lvl,
+			Txt: &txt,
+		},
+	}, l.secret)
 	if l.stdout {
 		fmt.Printf(template+"\n", args...)
 	}
