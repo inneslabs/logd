@@ -24,11 +24,11 @@ type Logger struct {
 }
 
 type LoggerCfg struct {
-	Host        string `yaml:"host"`
-	Port        int    `yaml:"port"`
-	WriteSecret string `yaml:"write_secret"`
-	MsgKey      string `yaml:"msg_key"`
-	Stdout      bool   `yaml:"stdout"`
+	Host   string `yaml:"host"`
+	Port   int    `yaml:"port"`
+	Secret string `yaml:"secret"`
+	MsgKey string `yaml:"msg_key"`
+	Stdout bool   `yaml:"stdout"`
 }
 
 func NewLogger(ctx context.Context, cfg *LoggerCfg) (*Logger, error) {
@@ -44,7 +44,7 @@ func NewLogger(ctx context.Context, cfg *LoggerCfg) (*Logger, error) {
 		ctx:         ctx,
 		conn:        conn,
 		rateLimiter: rate.NewLimiter(rate.Every(time.Microsecond*250), 20),
-		secret:      []byte(cfg.WriteSecret),
+		secret:      []byte(cfg.Secret),
 		msgKey:      cfg.MsgKey,
 		stdout:      cfg.Stdout,
 	}, nil
