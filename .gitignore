@@ -1,8 +1,6 @@
-.DS_Store
-__debug_bin*
-out.json
-test.sh
-.vscode/launch.json
 logd
 commit
 logdrc.yml
+.DS_Store
+__debug_bin*
+.vscode/launch.json
