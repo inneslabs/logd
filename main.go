@@ -22,7 +22,6 @@ type Cfg struct {
 
 func main() {
 	ctx := rootCtx()
-	// defaults
 	config := &Cfg{
 		Udp: &udp.Cfg{
 			Ctx:                 ctx,
@@ -46,17 +45,17 @@ func main() {
 		},
 	}
 
+	// load run config file
 	wd, err := os.Getwd()
 	if err != nil {
 		panic(err)
 	}
-
 	err = cfg.Load("logdrc.yml", wd, config)
 	if err != nil {
 		panic(err)
 	}
 
-	// env vars overwrite all
+	// secret env vars take precedent
 	readSecretEnv, set := os.LookupEnv("LOGD_READ_SECRET")
 	if set {
 		config.Udp.ReadSecret = readSecretEnv
