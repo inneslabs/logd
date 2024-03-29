@@ -65,14 +65,18 @@ func main() {
 		panic(err)
 	}
 
+	fmt.Printf("🌱 running: %+v\n", config)
+
 	// secret env vars take precedent
 	readSecretEnv, set := os.LookupEnv("LOGD_READ_SECRET")
 	if set {
 		config.Udp.ReadSecret = readSecretEnv
+		fmt.Println("read secret loaded from env var")
 	}
 	writeSecretEnv, set := os.LookupEnv("LOGD_WRITE_SECRET")
 	if set {
 		config.Udp.WriteSecret = writeSecretEnv
+		fmt.Println("write secret loaded from env var")
 	}
 
 	// wiring up
