@@ -49,8 +49,8 @@ payload, err := proto.Marshal(&cmd.Cmd{
 		},
 	})
 
-// get ephemeral signature using current time
-signedMsg, _ := auth.Sign("some-secret-value", payload, time.Now())
+// sign packet
+signedMsg, _ := auth.Sign([]byte("your-secret"), payload, time.Now())
 
 // write to socket
 socket.Write(signedMsg)
