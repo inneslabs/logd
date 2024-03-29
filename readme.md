@@ -1,32 +1,27 @@
-# Logd
-
-
-## Tail & query logs for unlimited apps.
-Logd is an application that stores an in-memory map of ring buffers. The service listens for ephemerally-signed UDP packets. Each packet is a log event.
-
-The protocol is very simple, defined in Protobuf.
-
-Logd will not run out of memory if the buffer sizes are ok for the provisioned memory.
-I sometimes bet that most logs don't fill the packet buffer, so I under-provision memory.
-
-The ring buffer uses a single atomic pointer, `head`.
-Each write advances the pointer forward.
-Reading is normally back from `head`.
+# Tail & query real-time logs of many apps.
+A simple protocol for log data, built on Protobuf, SHA256, and UDP.
+Currently, there is only a map of ring buffers in memory.
+This program does not yet write log data to a file, although this is clearly an important feature to come.
+It must also 
 
 # To Do
 ## Fix replay-attack vulnerability
-Note: If we run logd in the private network, this is absolutely no issue, but would be nice to implement for sake of correctness.
-
 There is currently no cache of UDP packet hashes, so we can't yet detect & drop a replay. A small ring buffer would probably be ideal for this.
 `Estimated time: 2 hours`
 
+## Automate secret rotation
+Note: Now easier on EC2. I still need to get SecretsManagerRotation v0.2.0 into prod.
+**Maybe it is no-longer necessary to store this secret in the SOPS file.**
+We could just deploy the secret everywhere at the same time without it being available to read anywhere.
+`Estimated time: 4 hours`
+
 # Auth
-Logd authenticates clients for either reading or writing using shared that could be named `LOGD_READ_SECRET` and `LOGD_WRITE_SECRET`. These are stored encrypted in our secrets SOPS file, and set in AWS Secrets Manager.
+Logd authenticates clients for either reading or writing using SHA256 hash-based message authentication.
 
-## Why shared secrets?
-Writing is over UDP only. This will not change because cheap real-time logging is the core offering.
+I chose to use hash-based ephemeral message authentication with a very short TTL (100ms)
+because it's computationally cheap, and simple, and it's cheap to guard against replays over a short timespan.
 
-I chose to use hash-based ephemeral message authentication with a very short signature ttl (100ms) to limit the potential for replays. Preventing replays futher is then much easier & less computationally expensive.
+Writing is over UDP only. This will *probably* not change for sake of simplicity, although sometimes I do wish for it.
 
 # Logger
 The simplest way to write logs is using the `logger` package.
