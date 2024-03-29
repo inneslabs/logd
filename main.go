@@ -12,6 +12,7 @@ import (
 	"github.com/inneslabs/logd/app"
 	"github.com/inneslabs/logd/store"
 	"github.com/inneslabs/logd/udp"
+	//_ "net/http/pprof"
 )
 
 type Cfg struct {
@@ -21,6 +22,13 @@ type Cfg struct {
 }
 
 func main() {
+	// serve pprof
+	/*
+		go func() {
+			log.Println(http.ListenAndServe("localhost:8080", nil))
+		}()
+	*/
+
 	ctx := rootCtx()
 	config := &Cfg{
 		Udp: &udp.Cfg{
