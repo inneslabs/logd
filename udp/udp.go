@@ -10,9 +10,9 @@ import (
 	"time"
 
 	"github.com/inneslabs/fnpool"
-	"github.com/inneslabs/logd/auth"
 	"github.com/inneslabs/logd/cmd"
 	"github.com/inneslabs/logd/guard"
+	"github.com/inneslabs/logd/sign"
 	"github.com/inneslabs/logd/store"
 	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
@@ -40,21 +40,23 @@ type UdpSvc struct {
 	pkgPool          *sync.Pool
 	workerPool       *fnpool.Pool
 	guard            *guard.Guard
+	signer           *sign.BaseSigner
 }
 
 type Cfg struct {
 	Ctx                 context.Context
 	LogStore            *store.Store
-	WorkerPoolSize      int           `yaml:"worker_pool_size"`
-	LaddrPort           string        `yaml:"laddr_port"`
-	Guard               *guard.Cfg    `yaml:"guard"`
-	SumTtl              time.Duration `yaml:"sum_ttl"`
-	ReadSecret          string        `yaml:"read_secret"`
-	WriteSecret         string        `yaml:"write_secret"`
-	SubRateLimitEvery   time.Duration `yaml:"sub_rate_limit_every"`
-	SubRateLimitBurst   int           `yaml:"sub_rate_limit_burst"`
-	QueryRateLimitEvery time.Duration `yaml:"query_rate_limit_every"`
-	QueryRateLimitBurst int           `yaml:"query_rate_limit_burst"`
+	WorkerPoolSize      int                 `yaml:"worker_pool_size"`
+	LaddrPort           string              `yaml:"laddr_port"`
+	Guard               *guard.Cfg          `yaml:"guard"`
+	SumTtl              time.Duration       `yaml:"sum_ttl"`
+	ReadSecret          string              `yaml:"read_secret"`
+	WriteSecret         string              `yaml:"write_secret"`
+	SubRateLimitEvery   time.Duration       `yaml:"sub_rate_limit_every"`
+	SubRateLimitBurst   int                 `yaml:"sub_rate_limit_burst"`
+	QueryRateLimitEvery time.Duration       `yaml:"query_rate_limit_every"`
+	QueryRateLimitBurst int                 `yaml:"query_rate_limit_burst"`
+	Signer              *sign.BaseSignerCfg `yaml:"signer"`
 }
 
 type Sub struct {
@@ -89,14 +91,15 @@ func NewSvc(cfg *Cfg) *UdpSvc {
 		logStore:         cfg.LogStore,
 		pkgPool: &sync.Pool{
 			New: func() any {
-				return &auth.Pkg{
-					Sum:       make([]byte, auth.SumLen),
-					TimeBytes: make([]byte, auth.TimeLen),
+				return &sign.Pkg{
+					Sum:       make([]byte, sign.SumLen),
+					TimeBytes: make([]byte, sign.TimeLen),
 					Payload:   make([]byte, MaxPacketSize),
 				}
 			},
 		},
 		workerPool: fnpool.NewPool(cfg.WorkerPoolSize),
+		signer:     sign.NewBaseSigner(cfg.Signer),
 	}
 	go svc.listen()
 	go svc.kickLateSubs()
@@ -141,8 +144,8 @@ func (svc *UdpSvc) readPacket() {
 
 func (svc *UdpSvc) handlePacket(packet *Packet) {
 	svc.workerPool.Dispatch(func() {
-		pkg, _ := svc.pkgPool.Get().(*auth.Pkg)
-		err := auth.UnpackSignedData(packet.Data, pkg)
+		pkg, _ := svc.pkgPool.Get().(*sign.Pkg)
+		err := sign.UnpackSignedData(packet.Data, pkg)
 		if err != nil {
 			return
 		}

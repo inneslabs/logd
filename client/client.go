@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/inneslabs/logd/auth"
 	"github.com/inneslabs/logd/cmd"
+	"github.com/inneslabs/logd/sign"
 	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
 )
@@ -16,6 +16,7 @@ import (
 type Client struct {
 	conn        net.Conn
 	rateLimiter *rate.Limiter
+	signer      *sign.BaseSigner
 }
 
 type Cfg struct {
@@ -45,7 +46,8 @@ func NewClient(cfg *Cfg) (*Client, error) {
 		return nil, fmt.Errorf("error dialing: %w", err)
 	}
 	cl := &Client{
-		conn: conn,
+		conn:   conn,
+		signer: sign.NewBaseSigner(&sign.BaseSignerCfg{}),
 	}
 	if cfg.RateLimitEvery > 0 {
 		cl.rateLimiter = rate.NewLimiter(
@@ -55,12 +57,12 @@ func NewClient(cfg *Cfg) (*Client, error) {
 	return cl, nil
 }
 
-func SignCmd(ctx context.Context, command *cmd.Cmd, secret []byte) ([]byte, error) {
+func (cl *Client) SignCmd(ctx context.Context, command *cmd.Cmd, secret []byte) ([]byte, error) {
 	payload, err := proto.Marshal(command)
 	if err != nil {
 		return nil, fmt.Errorf("err marshalling cmd: %w", err)
 	}
-	signed, err := auth.Sign(secret, payload)
+	signed, err := cl.signer.Sign(secret, payload)
 	if err != nil {
 		return nil, fmt.Errorf("err signing cmd: %w", err)
 	}

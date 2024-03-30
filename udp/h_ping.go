@@ -4,11 +4,11 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/inneslabs/logd/auth"
+	"github.com/inneslabs/logd/sign"
 )
 
-func (svc *UdpSvc) handlePing(raddr netip.AddrPort, pkg *auth.Pkg) {
-	valid, err := auth.Verify(svc.readSecret, pkg)
+func (svc *UdpSvc) handlePing(raddr netip.AddrPort, pkg *sign.Pkg) {
+	valid, err := svc.signer.Verify(svc.readSecret, pkg)
 	if !valid || err != nil {
 		return
 	}

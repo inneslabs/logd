@@ -1,6 +1,11 @@
-package auth
+package sign
 
 import "errors"
+
+const (
+	SumLen  = 32
+	TimeLen = 8
+)
 
 type Pkg struct {
 	Sum,

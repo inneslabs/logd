@@ -1,4 +1,4 @@
-package auth
+package sign
 
 import (
 	"testing"
@@ -22,7 +22,8 @@ func TestSignAndVerify(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	signed, err := SignWithTime(sec, payload, time.Now())
+	s := NewBaseSigner(&BaseSignerCfg{100 * time.Millisecond})
+	signed, err := s.Sign(sec, payload)
 	if err != nil {
 		t.FailNow()
 	}
@@ -31,7 +32,7 @@ func TestSignAndVerify(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	valid, err := Verify(sec, pkg)
+	valid, err := s.Verify(sec, pkg)
 	if !valid || err != nil {
 		t.Fatalf("failed with: %s", err)
 	}
@@ -50,8 +51,9 @@ func TestSignAndVerifyInvalid(t *testing.T) {
 		t.FailNow()
 	}
 	sec := []byte("testsecret")
-	boundary := time.Now().Add(-SigTtl)
-	signed, err := SignWithTime(sec, payload, boundary)
+	s := NewBaseSigner(&BaseSignerCfg{100 * time.Millisecond})
+	boundary := time.Now().Add(-s.sumTtl)
+	signed, err := s.signWithTime(sec, payload, boundary)
 	if err != nil {
 		t.FailNow()
 	}
@@ -60,7 +62,7 @@ func TestSignAndVerifyInvalid(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	valid, err := Verify(sec, pkg)
+	valid, err := s.Verify(sec, pkg)
 	if valid || err == nil {
 		t.FailNow()
 	}
@@ -79,9 +81,10 @@ func BenchmarkSign(b *testing.B) {
 		b.FailNow()
 	}
 	secret := []byte("testsecret")
+	s := NewBaseSigner(&BaseSignerCfg{100 * time.Millisecond})
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Sign(secret, payload)
+		s.Sign(secret, payload)
 	}
 }
 
@@ -98,7 +101,8 @@ func BenchmarkVerify(b *testing.B) {
 		b.FailNow()
 	}
 	secret := []byte("testsecret")
-	signed, err := Sign(secret, payload)
+	s := NewBaseSigner(&BaseSignerCfg{100 * time.Millisecond})
+	signed, err := s.Sign(secret, payload)
 	if err != nil {
 		b.FailNow()
 	}
@@ -109,6 +113,6 @@ func BenchmarkVerify(b *testing.B) {
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Verify(secret, pkg)
+		s.Verify(secret, pkg)
 	}
 }

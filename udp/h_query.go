@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/inneslabs/logd/auth"
 	"github.com/inneslabs/logd/cmd"
+	"github.com/inneslabs/logd/sign"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -16,22 +16,19 @@ const (
 	EndMsg    = "+END"
 )
 
-func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort, pkg *auth.Pkg) {
-	valid, err := auth.Verify(svc.readSecret, pkg)
+func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort, pkg *sign.Pkg) {
+	valid, err := svc.signer.Verify(svc.readSecret, pkg)
 	if !valid || err != nil {
 		return
 	}
 	if !svc.guard.Good(pkg.Sum) {
 		return
 	}
-
 	svc.queryRateLimiter.Wait(svc.ctx)
-
 	query := command.GetQueryParams()
 	offset := query.GetOffset()
 	limit := limit(query.GetLimit())
 	keyPrefix := query.GetKeyPrefix()
-
 	for log := range svc.logStore.Read(keyPrefix, offset, limit) {
 		msg := &cmd.Msg{}
 		err = proto.Unmarshal(log, msg)
@@ -50,7 +47,6 @@ func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort, pkg *auth
 			}
 		}
 	}
-
 	time.Sleep(time.Millisecond * 10) // ensure +END arrives last
 	svc.reply(EndMsg, raddr)
 }
@@ -68,7 +64,6 @@ func matchMsg(msg *cmd.Msg, query *cmd.QueryParams) bool {
 	url := query.GetUrl()
 	responseStatus := query.GetResponseStatus()
 	msgT := msg.T.AsTime()
-
 	if tStart != nil && msgT.Before(*tStart) {
 		return false
 	}

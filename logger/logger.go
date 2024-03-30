@@ -25,13 +25,13 @@ type LoggerCfg struct {
 }
 
 func NewLogger(ctx context.Context, cfg *LoggerCfg) (*Logger, error) {
-	client, err := client.NewClient(cfg.Client)
+	cl, err := client.NewClient(cfg.Client)
 	if err != nil {
 		return nil, fmt.Errorf("err initializing client: %w", err)
 	}
 	return &Logger{
 		ctx:    ctx,
-		client: client,
+		client: cl,
 		secret: []byte(cfg.Secret),
 		msgKey: cfg.MsgKey,
 		stdout: cfg.Stdout,
@@ -40,7 +40,7 @@ func NewLogger(ctx context.Context, cfg *LoggerCfg) (*Logger, error) {
 
 func (l *Logger) Log(lvl *cmd.Lvl, template string, args ...interface{}) {
 	txt := fmt.Sprintf(template, args...)
-	signed, _ := client.SignCmd(l.ctx, &cmd.Cmd{
+	signed, _ := l.client.SignCmd(l.ctx, &cmd.Cmd{
 		Name: cmd.Name_WRITE,
 		Msg: &cmd.Msg{
 			T:   timestamppb.Now(),

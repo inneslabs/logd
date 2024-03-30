@@ -11,7 +11,7 @@ import (
 )
 
 func (cl *Client) Tail(ctx context.Context, q *cmd.QueryParams, secret []byte) (<-chan *cmd.Msg, error) {
-	signed, err := SignCmd(ctx, &cmd.Cmd{
+	signed, err := cl.SignCmd(ctx, &cmd.Cmd{
 		Name:        cmd.Name_TAIL,
 		QueryParams: q,
 	}, secret)
@@ -36,7 +36,7 @@ func (cl *Client) Tail(ctx context.Context, q *cmd.QueryParams, secret []byte) (
 func (cl *Client) ping(ctx context.Context, secret []byte) {
 	for {
 		time.Sleep(udp.PingPeriod)
-		signed, err := SignCmd(ctx, &cmd.Cmd{
+		signed, err := cl.SignCmd(ctx, &cmd.Cmd{
 			Name: cmd.Name_PING,
 		}, secret)
 		if err != nil {

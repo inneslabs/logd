@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/inneslabs/logd/auth"
 	"github.com/inneslabs/logd/cmd"
+	"github.com/inneslabs/logd/sign"
 	"google.golang.org/protobuf/proto"
 )
 
-func (svc *UdpSvc) handleWrite(c *cmd.Cmd, pkg *auth.Pkg) {
-	valid, err := auth.Verify(svc.writeSecret, pkg)
+func (svc *UdpSvc) handleWrite(c *cmd.Cmd, pkg *sign.Pkg) {
+	valid, err := svc.signer.Verify(svc.writeSecret, pkg)
 	if !valid || err != nil {
 		return
 	}

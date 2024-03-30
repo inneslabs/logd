@@ -11,7 +11,7 @@ import (
 )
 
 func (cl *Client) Query(ctx context.Context, q *cmd.QueryParams, secret []byte) (<-chan *cmd.Msg, error) {
-	signed, err := SignCmd(ctx, &cmd.Cmd{
+	signed, err := cl.SignCmd(ctx, &cmd.Cmd{
 		Name:        cmd.Name_QUERY,
 		QueryParams: q,
 	}, secret)
