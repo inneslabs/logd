@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/inneslabs/logd/cmd"
-	"github.com/inneslabs/logd/sign"
+	"github.com/inneslabs/logd/pkg"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -16,8 +16,8 @@ const (
 	EndMsg    = "+END"
 )
 
-func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort, pkg *sign.Pkg) {
-	if !svc.guard.Good(svc.readSecret, pkg) {
+func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort, p *pkg.Pkg) {
+	if !svc.guard.Good(svc.readSecret, p) {
 		return
 	}
 	svc.queryRateLimiter.Wait(svc.ctx)

@@ -6,11 +6,11 @@ import (
 	"time"
 
 	"github.com/inneslabs/logd/cmd"
-	"github.com/inneslabs/logd/sign"
+	"github.com/inneslabs/logd/pkg"
 )
 
-func (svc *UdpSvc) handleTail(c *cmd.Cmd, raddr netip.AddrPort, pkg *sign.Pkg) {
-	if !svc.guard.Good(svc.readSecret, pkg) {
+func (svc *UdpSvc) handleTail(c *cmd.Cmd, raddr netip.AddrPort, p *pkg.Pkg) {
+	if !svc.guard.Good(svc.readSecret, p) {
 		return
 	}
 	svc.subsMu.Lock()

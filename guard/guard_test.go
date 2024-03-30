@@ -2,11 +2,10 @@ package guard
 
 import (
 	"crypto/sha256"
-	"encoding/binary"
 	"testing"
 	"time"
 
-	"github.com/inneslabs/logd/sign"
+	"github.com/inneslabs/logd/pkg"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -22,15 +21,15 @@ func TestGuardGood(t *testing.T) {
 	payload := []byte("payload")
 	sum := calculateSum(secret, timeBytes, payload)
 
-	pkg := &sign.Pkg{
+	p := &pkg.Pkg{
 		TimeBytes: timeBytes,
 		Payload:   payload,
 		Sum:       sum,
 	}
 
-	assert.True(t, guard.Good(secret, pkg), "Expected package to be good")
+	assert.True(t, guard.Good(secret, p), "Expected package to be good")
 
-	assert.False(t, guard.Good(secret, pkg), "Expected package to be rejected due to replay")
+	assert.False(t, guard.Good(secret, p), "Expected package to be rejected due to replay")
 }
 
 func TestGuardReplay(t *testing.T) {
@@ -45,7 +44,7 @@ func TestGuardReplay(t *testing.T) {
 	payload := []byte("payload")
 	sum := calculateSum(secret, timeBytes, payload)
 
-	pkg := &sign.Pkg{
+	p := &pkg.Pkg{
 		TimeBytes: timeBytes,
 		Payload:   payload,
 		Sum:       sum,
@@ -53,28 +52,9 @@ func TestGuardReplay(t *testing.T) {
 
 	assert.False(t, guard.replay(sum), "Expected sum not to be found in history")
 
-	guard.Good(secret, pkg) // This should add the sum to the history
+	guard.Good(secret, p) // This should add the sum to the history
 
 	assert.True(t, guard.replay(sum), "Expected sum to be found in history due to replay")
-}
-
-func TestConvertBytesToTime(t *testing.T) {
-	currentTime := time.Now()
-	timeBytes, _ := currentTime.MarshalBinary()
-
-	convertedTime, err := convertBytesToTime(timeBytes)
-	assert.NoError(t, err, "Expected no error converting bytes to time")
-	assert.Equal(t, currentTime.Round(time.Second), convertedTime.Round(time.Second), "Expected times to be equal")
-}
-
-func TestBytesToInt64(t *testing.T) {
-	expected := int64(1234567890)
-	b := make([]byte, 8)
-	binary.BigEndian.PutUint64(b, uint64(expected))
-
-	result, err := bytesToInt64(b)
-	assert.NoError(t, err, "Expected no error converting bytes to int64")
-	assert.Equal(t, expected, result, "Expected int64 values to be equal")
 }
 
 // Helper function to calculate sum for testing

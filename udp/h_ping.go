@@ -4,11 +4,11 @@ import (
 	"net/netip"
 	"time"
 
-	"github.com/inneslabs/logd/sign"
+	"github.com/inneslabs/logd/pkg"
 )
 
-func (svc *UdpSvc) handlePing(raddr netip.AddrPort, pkg *sign.Pkg) {
-	if !svc.guard.Good(svc.readSecret, pkg) {
+func (svc *UdpSvc) handlePing(raddr netip.AddrPort, p *pkg.Pkg) {
+	if !svc.guard.Good(svc.readSecret, p) {
 		return
 	}
 	svc.subsMu.Lock()

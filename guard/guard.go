@@ -4,13 +4,12 @@ import (
 	"bytes"
 	"container/ring"
 	"crypto/sha256"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"sync"
 	"time"
 
-	"github.com/inneslabs/logd/sign"
+	"github.com/inneslabs/logd/pkg"
 )
 
 type Guard struct {
@@ -31,12 +30,12 @@ func NewGuard(cfg *Cfg) *Guard {
 	}
 }
 
-func (g *Guard) Good(secret []byte, pkg *sign.Pkg) bool {
-	authed, err := g.verify(secret, pkg)
+func (g *Guard) Good(secret []byte, p *pkg.Pkg) bool {
+	authed, err := g.verify(secret, p)
 	if err != nil || !authed {
 		return false
 	}
-	return !g.replay(pkg.Sum)
+	return !g.replay(p.Sum)
 }
 
 func (g *Guard) replay(sum []byte) bool {
@@ -60,9 +59,9 @@ func (g *Guard) replay(sum []byte) bool {
 }
 
 // Verify signed payload
-func (g *Guard) verify(secret []byte, pkg *sign.Pkg) (bool, error) {
-	// convert time
-	t, err := convertBytesToTime(pkg.TimeBytes)
+func (g *Guard) verify(secret []byte, p *pkg.Pkg) (bool, error) {
+	var t time.Time
+	err := t.UnmarshalBinary(p.TimeBytes)
 	if err != nil {
 		return false, fmt.Errorf("convert bytes to time err: %w", err)
 	}
@@ -71,39 +70,14 @@ func (g *Guard) verify(secret []byte, pkg *sign.Pkg) (bool, error) {
 		return false, errors.New("time is outside of threshold")
 	}
 	// pre-allocate slice
-	totalLen := len(secret) + len(pkg.TimeBytes) + len(pkg.Payload)
+	totalLen := len(secret) + len(p.TimeBytes) + len(p.Payload)
 	data := make([]byte, 0, totalLen)
 	// copy data
 	data = append(data, secret...)
-	data = append(data, pkg.TimeBytes...)
-	data = append(data, pkg.Payload...)
+	data = append(data, p.TimeBytes...)
+	data = append(data, p.Payload...)
 	// compute checksum
 	h := sha256.Sum256(data)
 	// verify equality
-	return bytes.Equal(pkg.Sum, h[:32]), nil
-}
-
-func convertBytesToTime(b []byte) (time.Time, error) {
-	if len(b) != 8 {
-		return time.Time{}, fmt.Errorf("byte slice must be exactly 8 bytes long")
-	}
-	nano, err := bytesToInt64(b)
-	if err != nil {
-		return time.Time{}, fmt.Errorf("failed to convert bytes to int64: %w", err)
-	}
-	return time.Unix(0, nano), nil
-}
-
-func bytesToInt64(b []byte) (int64, error) {
-	if len(b) != 8 {
-		return 0, fmt.Errorf("byte slice must be exactly 8 bytes long")
-	}
-
-	var num int64
-	buf := bytes.NewReader(b)
-	err := binary.Read(buf, binary.BigEndian, &num)
-	if err != nil {
-		return 0, err
-	}
-	return num, nil
+	return bytes.Equal(p.Sum, h[:32]), nil
 }

@@ -12,7 +12,7 @@ import (
 	"github.com/inneslabs/fnpool"
 	"github.com/inneslabs/logd/cmd"
 	"github.com/inneslabs/logd/guard"
-	"github.com/inneslabs/logd/sign"
+	"github.com/inneslabs/logd/pkg"
 	"github.com/inneslabs/logd/store"
 	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
@@ -88,7 +88,7 @@ func NewSvc(cfg *Cfg) *UdpSvc {
 		logStore:         cfg.LogStore,
 		pkgPool: &sync.Pool{
 			New: func() any {
-				return &sign.Pkg{
+				return &pkg.Pkg{
 					Sum:       make([]byte, 32), // sha256
 					TimeBytes: make([]byte, 8),  // uint64
 					Payload:   make([]byte, MaxPacketSize),
@@ -140,27 +140,27 @@ func (svc *UdpSvc) readPacket() {
 
 func (svc *UdpSvc) handlePacket(packet *Packet) {
 	svc.workerPool.Dispatch(func() {
-		pkg, _ := svc.pkgPool.Get().(*sign.Pkg)
-		err := sign.UnpackSignedData(packet.Data, pkg)
+		p, _ := svc.pkgPool.Get().(*pkg.Pkg)
+		err := pkg.Unpack(packet.Data, p)
 		if err != nil {
 			return
 		}
 		c := &cmd.Cmd{}
-		err = proto.Unmarshal(pkg.Payload, c)
+		err = proto.Unmarshal(p.Payload, c)
 		if err != nil {
 			return
 		}
 		switch c.GetName() {
 		case cmd.Name_WRITE:
-			svc.handleWrite(c, pkg)
+			svc.handleWrite(c, p)
 		case cmd.Name_TAIL:
-			svc.handleTail(c, packet.Raddr, pkg)
+			svc.handleTail(c, packet.Raddr, p)
 		case cmd.Name_PING:
-			svc.handlePing(packet.Raddr, pkg)
+			svc.handlePing(packet.Raddr, p)
 		case cmd.Name_QUERY:
-			svc.handleQuery(c, packet.Raddr, pkg)
+			svc.handleQuery(c, packet.Raddr, p)
 		}
-		svc.pkgPool.Put(pkg)
+		svc.pkgPool.Put(p)
 	})
 }
 
