@@ -1,6 +1,7 @@
 logd
 commit
 logdrc.yml
+logd_secrets.yml
 .DS_Store
 __debug_bin*
 .vscode/launch.json
