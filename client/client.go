@@ -40,9 +40,13 @@ func NewClient(cfg *Cfg) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error dialing: %w", err)
 	}
-	limit := rate.NewLimiter(rate.Every(cfg.RateLimitEvery), cfg.RateLimitBurst)
-	return &Client{
-		conn:        conn,
-		rateLimiter: limit,
-	}, nil
+	cl := &Client{
+		conn: conn,
+	}
+	if cfg.RateLimitEvery > 0 {
+		cl.rateLimiter = rate.NewLimiter(
+			rate.Every(cfg.RateLimitEvery),
+			cfg.RateLimitBurst)
+	}
+	return cl, nil
 }
