@@ -1,17 +1,19 @@
 package udp
 
 import (
-	"fmt"
 	"net/netip"
 	"time"
 
 	"github.com/inneslabs/logd/auth"
 )
 
-func (svc *UdpSvc) handlePing(raddr netip.AddrPort, unpk *auth.Unpacked) error {
-	valid, err := auth.Verify(svc.readSecret, unpk)
+func (svc *UdpSvc) handlePing(raddr netip.AddrPort, pkg *auth.Pkg) {
+	valid, err := auth.Verify(svc.readSecret, pkg)
 	if !valid || err != nil {
-		return fmt.Errorf("%s unauthorised to tail: %w", raddr.String(), err)
+		return
+	}
+	if !svc.guard.Good(pkg.Sum) {
+		return
 	}
 	svc.subsMu.Lock()
 	sub := svc.subs[raddr.String()]
@@ -19,5 +21,4 @@ func (svc *UdpSvc) handlePing(raddr netip.AddrPort, unpk *auth.Unpacked) error {
 		sub.lastPing = time.Now()
 	}
 	svc.subsMu.Unlock()
-	return nil
 }

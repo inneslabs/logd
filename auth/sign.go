@@ -14,13 +14,10 @@ const (
 	TimeLen = 8
 )
 
-// Sign payload using current time + sig ttl
 func Sign(secret, payload []byte) ([]byte, error) {
-	t := time.Now().Add(SigTtl)
-	return SignWithTime(secret, payload, t)
+	return SignWithTime(secret, payload, time.Now())
 }
 
-// Sign payload with given time
 func SignWithTime(secret, payload []byte, t time.Time) ([]byte, error) {
 	timeBytes, err := convertTimeToBytes(t)
 	if err != nil {
@@ -42,30 +39,29 @@ func SignWithTime(secret, payload []byte, t time.Time) ([]byte, error) {
 }
 
 // Verify signed payload
-func Verify(secret []byte, unpk *Unpacked) (bool, error) {
+func Verify(secret []byte, pkg *Pkg) (bool, error) {
 	// if secret is unset, return true immediately
 	if len(secret) == 0 {
 		return true, nil
 	}
 	// convert time
-	t, err := convertBytesToTime(unpk.TimeBytes)
+	t, err := convertBytesToTime(pkg.TimeBytes)
 	if err != nil {
 		return false, fmt.Errorf("convert bytes to time err: %w", err)
 	}
 	// verify timestamp is within threshold
-	if t.After(time.Now().Add(SigTtl)) ||
-		t.Before(time.Now().Add(-SigTtl)) {
+	if t.After(time.Now()) || t.Before(time.Now().Add(-SigTtl)) {
 		return false, errors.New("time is outside of threshold")
 	}
 	// pre-allocate slice
-	totalLen := len(secret) + len(unpk.TimeBytes) + len(unpk.Payload)
+	totalLen := len(secret) + len(pkg.TimeBytes) + len(pkg.Payload)
 	data := make([]byte, 0, totalLen)
 	// copy data
 	data = append(data, secret...)
-	data = append(data, unpk.TimeBytes...)
-	data = append(data, unpk.Payload...)
+	data = append(data, pkg.TimeBytes...)
+	data = append(data, pkg.Payload...)
 	// compute checksum
 	h := sha256.Sum256(data)
 	// verify equality
-	return bytes.Equal(unpk.Sum, h[:SumLen]), nil
+	return bytes.Equal(pkg.Sum, h[:SumLen]), nil
 }

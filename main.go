@@ -11,6 +11,7 @@ import (
 
 	"github.com/inneslabs/cfg"
 	"github.com/inneslabs/logd/app"
+	"github.com/inneslabs/logd/guard"
 	"github.com/inneslabs/logd/store"
 	"github.com/inneslabs/logd/udp"
 	//_ "net/http/pprof"
@@ -33,11 +34,14 @@ func main() {
 	ctx := rootCtx()
 	config := &Cfg{
 		Udp: &udp.Cfg{
-			Ctx:                 ctx,
-			WorkerPoolSize:      runtime.NumCPU(),
-			LaddrPort:           ":6102",
-			ReadSecret:          "gold",
-			WriteSecret:         "bitcoin",
+			Ctx:            ctx,
+			WorkerPoolSize: runtime.NumCPU(),
+			LaddrPort:      ":6102",
+			ReadSecret:     "gold",
+			WriteSecret:    "bitcoin",
+			Guard: &guard.Cfg{
+				HistorySize: 10,
+			},
 			SubRateLimitEvery:   100 * time.Microsecond,
 			SubRateLimitBurst:   20,
 			QueryRateLimitEvery: 100 * time.Microsecond,
@@ -66,9 +70,6 @@ func main() {
 	}
 
 	fmt.Println("🌱 running")
-	fmt.Printf("udp: %+v\n", config.Udp)
-	fmt.Printf("app: %+v\n", config.App)
-	fmt.Printf("store: %+v\n", config.Store)
 
 	// secret env vars take precedent
 	readSecretEnv, set := os.LookupEnv("LOGD_READ_SECRET")

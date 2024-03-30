@@ -12,20 +12,19 @@ import (
 	"github.com/inneslabs/fnpool"
 	"github.com/inneslabs/logd/auth"
 	"github.com/inneslabs/logd/cmd"
+	"github.com/inneslabs/logd/guard"
 	"github.com/inneslabs/logd/store"
 	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
 )
 
 const (
-	MaxPacketSize = 1920
-	ReplyKey      = "//logd"
+	MaxPacketSize         = 1920
+	ReplyKey              = "//logd"
+	PingPeriod            = time.Second * 2
+	KickAfterMissingPings = 3
 )
 
-// IMPORTANT:
-// REPLAY VULNERABILITY MUST BE SOLVED,
-// THIS THING IS BROKEN VERY EASILY.
-// THIS SHOULD RUN IN A PRIVATE NETWORK.
 type UdpSvc struct {
 	ctx              context.Context
 	laddrPort        string
@@ -38,8 +37,9 @@ type UdpSvc struct {
 	readSecret       []byte
 	writeSecret      []byte
 	logStore         *store.Store
-	unpkPool         *sync.Pool
-	packetWorkerPool *fnpool.Pool
+	pkgPool          *sync.Pool
+	workerPool       *fnpool.Pool
+	guard            *guard.Guard
 }
 
 type Cfg struct {
@@ -47,6 +47,8 @@ type Cfg struct {
 	LogStore            *store.Store
 	WorkerPoolSize      int           `yaml:"worker_pool_size"`
 	LaddrPort           string        `yaml:"laddr_port"`
+	Guard               *guard.Cfg    `yaml:"guard"`
+	SumTtl              time.Duration `yaml:"sum_ttl"`
 	ReadSecret          string        `yaml:"read_secret"`
 	WriteSecret         string        `yaml:"write_secret"`
 	SubRateLimitEvery   time.Duration `yaml:"sub_rate_limit_every"`
@@ -75,6 +77,7 @@ func NewSvc(cfg *Cfg) *UdpSvc {
 	svc := &UdpSvc{
 		ctx:       cfg.Ctx,
 		laddrPort: cfg.LaddrPort,
+		guard:     guard.NewGuard(cfg.Guard),
 		subs:      make(map[string]*Sub),
 		subsMu:    sync.RWMutex{},
 		// increased buffer size from 4 (2024-02-11)
@@ -84,21 +87,19 @@ func NewSvc(cfg *Cfg) *UdpSvc {
 		readSecret:       []byte(cfg.ReadSecret),
 		writeSecret:      []byte(cfg.WriteSecret),
 		logStore:         cfg.LogStore,
-		unpkPool: &sync.Pool{
+		pkgPool: &sync.Pool{
 			New: func() any {
-				return &auth.Unpacked{
+				return &auth.Pkg{
 					Sum:       make([]byte, auth.SumLen),
 					TimeBytes: make([]byte, auth.TimeLen),
 					Payload:   make([]byte, MaxPacketSize),
 				}
 			},
 		},
-		packetWorkerPool: fnpool.NewPool(cfg.WorkerPoolSize),
+		workerPool: fnpool.NewPool(cfg.WorkerPoolSize),
 	}
 	go svc.listen()
-	// one gopher kicks subs that don't ping
 	go svc.kickLateSubs()
-	// one gopher writes to the subs
 	go svc.writeToSubs()
 	return svc
 }
@@ -121,7 +122,7 @@ func (svc *UdpSvc) listen() {
 	fmt.Println("listening udp on", svc.conn.LocalAddr())
 	<-svc.ctx.Done()
 	fmt.Println("packet handler pool stopping...")
-	svc.packetWorkerPool.StopAndWait()
+	svc.workerPool.StopAndWait()
 	fmt.Println("packet handler pool stopped")
 	fmt.Println("udp svc shutdown")
 }
@@ -130,7 +131,6 @@ func (svc *UdpSvc) readPacket() {
 	buf := make([]byte, MaxPacketSize)
 	n, raddr, err := svc.conn.ReadFromUDPAddrPort(buf)
 	if err != nil {
-		// todo: handle this
 		return
 	}
 	svc.handlePacket(&Packet{
@@ -140,31 +140,28 @@ func (svc *UdpSvc) readPacket() {
 }
 
 func (svc *UdpSvc) handlePacket(packet *Packet) {
-	svc.packetWorkerPool.Dispatch(func() {
-		// get a *Unpacked from pool
-		unpk, _ := svc.unpkPool.Get().(*auth.Unpacked)
-		err := auth.UnpackSignedData(packet.Data, unpk)
+	svc.workerPool.Dispatch(func() {
+		pkg, _ := svc.pkgPool.Get().(*auth.Pkg)
+		err := auth.UnpackSignedData(packet.Data, pkg)
 		if err != nil {
 			return
 		}
 		c := &cmd.Cmd{}
-		err = proto.Unmarshal(unpk.Payload, c)
+		err = proto.Unmarshal(pkg.Payload, c)
 		if err != nil {
 			return
 		}
-		// ignore errors
 		switch c.GetName() {
 		case cmd.Name_WRITE:
-			svc.handleWrite(c, unpk)
+			svc.handleWrite(c, pkg)
 		case cmd.Name_TAIL:
-			svc.handleTail(c, packet.Raddr, unpk)
+			svc.handleTail(c, packet.Raddr, pkg)
 		case cmd.Name_PING:
-			svc.handlePing(packet.Raddr, unpk)
+			svc.handlePing(packet.Raddr, pkg)
 		case cmd.Name_QUERY:
-			svc.handleQuery(c, packet.Raddr, unpk)
+			svc.handleQuery(c, packet.Raddr, pkg)
 		}
-		// return *Unpacked to pool
-		svc.unpkPool.Put(unpk)
+		svc.pkgPool.Put(pkg)
 	})
 }
 
@@ -220,4 +217,24 @@ func (svc *UdpSvc) reply(txt string, raddr netip.AddrPort) {
 	})
 	svc.subRateLimiter.Wait(svc.ctx)
 	svc.conn.WriteToUDPAddrPort(payload, raddr)
+}
+
+func (svc *UdpSvc) kickLateSubs() {
+	for {
+		select {
+		case <-time.After(PingPeriod):
+			for _, sub := range svc.subs {
+				if sub.lastPing.Before(time.Now().Add(-(PingPeriod * KickAfterMissingPings))) {
+					svc.subsMu.Lock()
+					delete(svc.subs, sub.raddr.String())
+					svc.subsMu.Unlock()
+					fmt.Printf("kicked %s\n", sub.raddr.String())
+					svc.reply("kick", sub.raddr)
+				}
+			}
+		case <-svc.ctx.Done():
+			fmt.Println("kickLateSubs ended")
+			return
+		}
+	}
 }

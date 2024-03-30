@@ -84,7 +84,7 @@ func (app *App) serve() {
 				panic(fmt.Sprintf("failed to listen https: %v\n", err))
 			}
 		}
-		fmt.Println("app listening http on", app.laddrPort)
+		fmt.Println("listening http on", app.laddrPort)
 		err := server.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			panic(fmt.Sprintf("failed to listen http: %v\n", err))

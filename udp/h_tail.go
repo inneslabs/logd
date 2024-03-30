@@ -1,7 +1,6 @@
 package udp
 
 import (
-	"errors"
 	"fmt"
 	"net/netip"
 	"time"
@@ -10,10 +9,13 @@ import (
 	"github.com/inneslabs/logd/cmd"
 )
 
-func (svc *UdpSvc) handleTail(c *cmd.Cmd, raddr netip.AddrPort, unpk *auth.Unpacked) error {
-	valid, err := auth.Verify(svc.readSecret, unpk)
+func (svc *UdpSvc) handleTail(c *cmd.Cmd, raddr netip.AddrPort, pkg *auth.Pkg) {
+	valid, err := auth.Verify(svc.readSecret, pkg)
 	if !valid || err != nil {
-		return errors.New("unauthorized")
+		return
+	}
+	if !svc.guard.Good(pkg.Sum) {
+		return
 	}
 	svc.subsMu.Lock()
 	svc.subs[raddr.String()] = &Sub{
@@ -24,5 +26,4 @@ func (svc *UdpSvc) handleTail(c *cmd.Cmd, raddr netip.AddrPort, unpk *auth.Unpac
 	svc.subsMu.Unlock()
 	svc.reply("\rtailing logs\033[0K", raddr)
 	fmt.Println("got new tail", raddr.String())
-	return nil
 }

@@ -22,23 +22,22 @@ func TestSignAndVerify(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	signed, err := SignWithTime(sec, payload, time.Now().Add(SigTtl))
+	signed, err := SignWithTime(sec, payload, time.Now())
 	if err != nil {
 		t.FailNow()
 	}
-	unpk := &Unpacked{}
-	err = UnpackSignedData(signed, unpk)
+	pkg := &Pkg{}
+	err = UnpackSignedData(signed, pkg)
 	if err != nil {
 		t.FailNow()
 	}
-	valid, err := Verify(sec, unpk)
+	valid, err := Verify(sec, pkg)
 	if !valid || err != nil {
 		t.Fatalf("failed with: %s", err)
 	}
 }
 
 func TestSignAndVerifyInvalid(t *testing.T) {
-	sec := []byte("testsecret")
 	txt := "this is a test"
 	payload, err := proto.Marshal(&cmd.Cmd{
 		Name: cmd.Name_WRITE,
@@ -50,23 +49,24 @@ func TestSignAndVerifyInvalid(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	signed, err := SignWithTime(sec, payload, time.Now().Add(time.Second))
+	sec := []byte("testsecret")
+	boundary := time.Now().Add(-SigTtl)
+	signed, err := SignWithTime(sec, payload, boundary)
 	if err != nil {
 		t.FailNow()
 	}
-	unpk := &Unpacked{}
-	err = UnpackSignedData(signed, unpk)
+	pkg := &Pkg{}
+	err = UnpackSignedData(signed, pkg)
 	if err != nil {
 		t.FailNow()
 	}
-	valid, err := Verify(sec, unpk)
+	valid, err := Verify(sec, pkg)
 	if valid || err == nil {
 		t.FailNow()
 	}
 }
 
 func BenchmarkSign(b *testing.B) {
-	secret := []byte("testsecret")
 	txt := "test"
 	payload, err := proto.Marshal(&cmd.Cmd{
 		Name: cmd.Name_WRITE,
@@ -78,6 +78,7 @@ func BenchmarkSign(b *testing.B) {
 	if err != nil {
 		b.FailNow()
 	}
+	secret := []byte("testsecret")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		Sign(secret, payload)
@@ -85,7 +86,6 @@ func BenchmarkSign(b *testing.B) {
 }
 
 func BenchmarkVerify(b *testing.B) {
-	secret := []byte("testsecret")
 	txt := "test"
 	payload, err := proto.Marshal(&cmd.Cmd{
 		Name: cmd.Name_WRITE,
@@ -97,17 +97,18 @@ func BenchmarkVerify(b *testing.B) {
 	if err != nil {
 		b.FailNow()
 	}
+	secret := []byte("testsecret")
 	signed, err := Sign(secret, payload)
 	if err != nil {
 		b.FailNow()
 	}
-	unpk := &Unpacked{}
-	err = UnpackSignedData(signed, unpk)
+	pkg := &Pkg{}
+	err = UnpackSignedData(signed, pkg)
 	if err != nil {
 		b.FailNow()
 	}
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Verify(secret, unpk)
+		Verify(secret, pkg)
 	}
 }

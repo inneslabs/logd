@@ -1,7 +1,6 @@
 package udp
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -10,29 +9,27 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func (svc *UdpSvc) handleWrite(c *cmd.Cmd, unpk *auth.Unpacked) error {
-	// verify authenticity
-	valid, err := auth.Verify(svc.writeSecret, unpk)
+func (svc *UdpSvc) handleWrite(c *cmd.Cmd, pkg *auth.Pkg) {
+	valid, err := auth.Verify(svc.writeSecret, pkg)
 	if !valid || err != nil {
-		return errors.New("unauthorised to write")
+		return
 	}
-	// marshal msg
+	if !svc.guard.Good(pkg.Sum) {
+		return
+	}
 	msgBytes, err := proto.Marshal(c.Msg)
 	if err != nil {
-		return fmt.Errorf("protobuf marshal msg err: %w", err)
+		return
 	}
-	// write to store
 	msgKey := c.Msg.GetKey()
-	segments := strings.Split(msgKey, "/") // /prod/swi-core/SMRotation
+	segments := strings.Split(msgKey, "/")
 	if len(segments) < 3 {
-		return errors.New("invalid key")
+		return
 	}
 	storeKey := fmt.Sprintf("/%s/%s", segments[1], segments[2])
 	svc.logStore.Write(storeKey, msgBytes)
-	// send to tails
 	svc.forSubs <- &ProtoPair{
 		Msg:   c.Msg,
 		Bytes: msgBytes,
 	}
-	return nil
 }
