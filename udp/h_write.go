@@ -10,7 +10,7 @@ import (
 )
 
 func (svc *UdpSvc) handleWrite(c *cmd.Cmd, p *pkg.Pkg) {
-	if !svc.guard.Good(svc.writeSecret, p) {
+	if !svc.guard.Good([]byte(svc.secrets.Write), p) {
 		return
 	}
 	msgBytes, err := proto.Marshal(c.Msg)

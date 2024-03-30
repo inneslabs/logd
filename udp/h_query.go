@@ -17,7 +17,7 @@ const (
 )
 
 func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort, p *pkg.Pkg) {
-	if !svc.guard.Good(svc.readSecret, p) {
+	if !svc.guard.Good([]byte(svc.secrets.Read), p) {
 		return
 	}
 	svc.queryRateLimiter.Wait(svc.ctx)

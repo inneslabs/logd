@@ -10,7 +10,7 @@ import (
 )
 
 func (svc *UdpSvc) handleTail(c *cmd.Cmd, raddr netip.AddrPort, p *pkg.Pkg) {
-	if !svc.guard.Good(svc.readSecret, p) {
+	if !svc.guard.Good([]byte(svc.secrets.Read), p) {
 		return
 	}
 	svc.subsMu.Lock()

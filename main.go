@@ -16,6 +16,7 @@ import (
 	"github.com/inneslabs/logd/guard"
 	"github.com/inneslabs/logd/store"
 	"github.com/inneslabs/logd/udp"
+	"gopkg.in/yaml.v3"
 )
 
 type Cfg struct {
@@ -35,8 +36,10 @@ func main() {
 			Ctx:            ctx,
 			WorkerPoolSize: runtime.NumCPU(),
 			LaddrPort:      ":6102",
-			ReadSecret:     "gold",
-			WriteSecret:    "bitcoin",
+			Secrets: &udp.Secrets{
+				Read:  "gold",
+				Write: "bitcoin",
+			},
 			Guard: &guard.Cfg{
 				HistorySize: 1000,
 				SumTtl:      100 * time.Millisecond,
@@ -66,15 +69,14 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	readSecretEnv, set := os.LookupEnv("LOGD_READ_SECRET")
-	if set {
-		config.Udp.ReadSecret = readSecretEnv
-		fmt.Println("read secret loaded from env var")
-	}
-	writeSecretEnv, set := os.LookupEnv("LOGD_WRITE_SECRET")
-	if set {
-		config.Udp.WriteSecret = writeSecretEnv
-		fmt.Println("write secret loaded from env var")
+	secrets, err := os.ReadFile("logd_secrets.yml")
+	if err == nil {
+		err = yaml.Unmarshal(secrets, config.Udp.Secrets)
+		if err != nil {
+			fmt.Println("err parsing logd_secrets.yml:", err)
+		} else {
+			fmt.Println("secrets loaded from logd_secrets.yml")
+		}
 	}
 	logStore := store.NewStore(config.Store)
 	config.App.LogStore = logStore
@@ -83,8 +85,8 @@ func main() {
 	app.NewApp(config.App)
 	fmt.Println("🌱 running", string(commit))
 	fmt.Println("guard cfg:", config.Udp.Guard)
-	fmt.Println("read secret sha256:", secretHash(config.Udp.ReadSecret))
-	fmt.Println("write secret sha256:", secretHash(config.Udp.WriteSecret))
+	fmt.Println("read secret sha256:", secretHash(config.Udp.Secrets.Read))
+	fmt.Println("write secret sha256:", secretHash(config.Udp.Secrets.Write))
 	<-ctx.Done()
 	fmt.Println("all routines ended")
 }

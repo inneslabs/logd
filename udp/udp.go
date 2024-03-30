@@ -22,14 +22,18 @@ type Cfg struct {
 	WorkerPoolSize      int           `yaml:"worker_pool_size"`
 	LaddrPort           string        `yaml:"laddr_port"`
 	Guard               *guard.Cfg    `yaml:"guard"`
-	ReadSecret          string        `yaml:"read_secret"`
-	WriteSecret         string        `yaml:"write_secret"`
+	Secrets             *Secrets      `yaml:"secrets"`
 	SubRateLimitEvery   time.Duration `yaml:"sub_rate_limit_every"`
 	SubRateLimitBurst   int           `yaml:"sub_rate_limit_burst"`
 	QueryRateLimitEvery time.Duration `yaml:"query_rate_limit_every"`
 	QueryRateLimitBurst int           `yaml:"query_rate_limit_burst"`
 	LogStore            *store.Store
 	Ctx                 context.Context
+}
+
+type Secrets struct {
+	Read  string `yaml:"read"`
+	Write string `yaml:"write"`
 }
 
 const (
@@ -48,8 +52,7 @@ type UdpSvc struct {
 	forSubs          chan *ProtoPair
 	subRateLimiter   *rate.Limiter
 	queryRateLimiter *rate.Limiter
-	readSecret       []byte
-	writeSecret      []byte
+	secrets          *Secrets
 	logStore         *store.Store
 	pkgPool          *sync.Pool
 	workerPool       *fnpool.Pool
@@ -83,8 +86,7 @@ func NewSvc(cfg *Cfg) *UdpSvc {
 		forSubs:          make(chan *ProtoPair, 100),
 		subRateLimiter:   rate.NewLimiter(rate.Every(cfg.SubRateLimitEvery), cfg.SubRateLimitBurst),
 		queryRateLimiter: rate.NewLimiter(rate.Every(cfg.QueryRateLimitEvery), cfg.QueryRateLimitBurst),
-		readSecret:       []byte(cfg.ReadSecret),
-		writeSecret:      []byte(cfg.WriteSecret),
+		secrets:          cfg.Secrets,
 		logStore:         cfg.LogStore,
 		pkgPool: &sync.Pool{
 			New: func() any {
