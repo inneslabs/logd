@@ -52,18 +52,17 @@ func NewApp(cfg *Cfg) *App {
 		fmt.Println("failed to read commit file:", err)
 	}
 	app := &App{
-		// cfg
-		ctx:            cfg.Ctx,
-		logStore:       cfg.LogStore,
-		rateLimitEvery: cfg.RateLimitEvery,
-		rateLimitBurst: cfg.RateLimitBurst,
-		laddrPort:      cfg.LaddrPort,
-		tlsCertFname:   cfg.TLSCertFname,
-		tlsKeyFname:    cfg.TLSKeyFname,
-		// state
-		started: time.Now(),
-		commit:  string(commit),
-		clients: make(map[string]*client),
+		ctx:                      cfg.Ctx,
+		logStore:                 cfg.LogStore,
+		rateLimitEvery:           cfg.RateLimitEvery,
+		rateLimitBurst:           cfg.RateLimitBurst,
+		laddrPort:                cfg.LaddrPort,
+		tlsCertFname:             cfg.TLSCertFname,
+		tlsKeyFname:              cfg.TLSKeyFname,
+		accessControlAllowOrigin: cfg.AccessControlAllowOrigin,
+		started:                  time.Now(),
+		commit:                   string(commit),
+		clients:                  make(map[string]*client),
 	}
 	go app.cleanupClients()
 	go app.measureStatus()
@@ -115,9 +114,7 @@ func (app *App) corsMiddleware(next http.Handler) http.Handler {
 func (app *App) rateLimitMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		limiter := app.getRateLimiter(r)
-		if !limiter.Allow() &&
-			// TODO: REMOVE. TEST ONLY! Disables rate limit for POST
-			r.Method != "POST" {
+		if !limiter.Allow() {
 			w.WriteHeader(http.StatusTooManyRequests)
 			return
 		}
