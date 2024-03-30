@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/signal"
@@ -15,7 +17,6 @@ import (
 	"github.com/inneslabs/logd/sign"
 	"github.com/inneslabs/logd/store"
 	"github.com/inneslabs/logd/udp"
-	//_ "net/http/pprof"
 )
 
 type Cfg struct {
@@ -25,14 +26,11 @@ type Cfg struct {
 }
 
 func main() {
-	// serve pprof
-	/*
-		go func() {
-			log.Println(http.ListenAndServe("localhost:8080", nil))
-		}()
-	*/
-
 	ctx := rootCtx()
+	commit, err := os.ReadFile("commit")
+	if err != nil {
+		fmt.Println("failed to read commit file:", err)
+	}
 	config := &Cfg{
 		Udp: &udp.Cfg{
 			Ctx:            ctx,
@@ -41,7 +39,7 @@ func main() {
 			ReadSecret:     "gold",
 			WriteSecret:    "bitcoin",
 			Guard: &guard.Cfg{
-				HistorySize: 10,
+				HistorySize: 1000,
 			},
 			SubRateLimitEvery:   100 * time.Microsecond,
 			SubRateLimitBurst:   20,
@@ -53,6 +51,7 @@ func main() {
 		},
 		App: &app.Cfg{
 			Ctx:                      ctx,
+			Commit:                   commit,
 			LaddrPort:                ":6101",
 			RateLimitEvery:           500 * time.Millisecond,
 			RateLimitBurst:           10,
@@ -62,8 +61,6 @@ func main() {
 			FallbackSize: 100000,
 		},
 	}
-
-	// load run config file
 	wd, err := os.Getwd()
 	if err != nil {
 		panic(err)
@@ -72,10 +69,6 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-
-	fmt.Println("🌱 running")
-
-	// secret env vars take precedent
 	readSecretEnv, set := os.LookupEnv("LOGD_READ_SECRET")
 	if set {
 		config.Udp.ReadSecret = readSecretEnv
@@ -86,15 +79,16 @@ func main() {
 		config.Udp.WriteSecret = writeSecretEnv
 		fmt.Println("write secret loaded from env var")
 	}
-
-	// wiring up
 	logStore := store.NewStore(config.Store)
 	config.App.LogStore = logStore
 	config.Udp.LogStore = logStore
 	udp.NewSvc(config.Udp)
 	app.NewApp(config.App)
-
-	// wait for kill signal
+	fmt.Println("🌱 running", string(commit))
+	fmt.Println("guard history size:", config.Udp.Guard.HistorySize)
+	fmt.Println("signer sum ttl:", config.Udp.Signer.SumTtl)
+	fmt.Println("read secret sha256:", secretHash(config.Udp.ReadSecret))
+	fmt.Println("write secret sha256:", secretHash(config.Udp.WriteSecret))
 	<-ctx.Done()
 	fmt.Println("all routines ended")
 }
@@ -117,4 +111,9 @@ func rootCtx() context.Context {
 	ctx, cancel := context.WithCancel(context.Background())
 	go cancelOnKillSig(sigs, cancel)
 	return ctx
+}
+
+func secretHash(secret string) string {
+	readSecretSum := sha256.Sum256([]byte(secret))
+	return hex.EncodeToString(readSecretSum[:])
 }

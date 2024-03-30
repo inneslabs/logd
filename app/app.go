@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"sync"
 	"time"
 
@@ -22,17 +21,17 @@ type App struct {
 	tlsCertFname             string
 	tlsKeyFname              string
 	accessControlAllowOrigin string
-	// state
-	commit     string
-	started    time.Time
-	clientMu   sync.Mutex
-	clients    map[string]*client
-	statusJson []byte
+	commit                   string
+	started                  time.Time
+	clientMu                 sync.Mutex
+	clients                  map[string]*client
+	statusJson               []byte
 }
 
 type Cfg struct {
 	Ctx                      context.Context
 	LogStore                 *store.Store
+	Commit                   []byte
 	LaddrPort                string        `yaml:"laddr_port"`
 	RateLimitEvery           time.Duration `yaml:"rate_limit_every"`
 	RateLimitBurst           int           `yaml:"rate_limit_burst"`
@@ -47,10 +46,6 @@ type client struct {
 }
 
 func NewApp(cfg *Cfg) *App {
-	commit, err := os.ReadFile("commit")
-	if err != nil {
-		fmt.Println("failed to read commit file:", err)
-	}
 	app := &App{
 		ctx:                      cfg.Ctx,
 		logStore:                 cfg.LogStore,
@@ -61,7 +56,7 @@ func NewApp(cfg *Cfg) *App {
 		tlsKeyFname:              cfg.TLSKeyFname,
 		accessControlAllowOrigin: cfg.AccessControlAllowOrigin,
 		started:                  time.Now(),
-		commit:                   string(commit),
+		commit:                   string(cfg.Commit),
 		clients:                  make(map[string]*client),
 	}
 	go app.cleanupClients()
