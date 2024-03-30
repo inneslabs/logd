@@ -14,7 +14,6 @@ import (
 	"github.com/inneslabs/cfg"
 	"github.com/inneslabs/logd/app"
 	"github.com/inneslabs/logd/guard"
-	"github.com/inneslabs/logd/sign"
 	"github.com/inneslabs/logd/store"
 	"github.com/inneslabs/logd/udp"
 )
@@ -40,20 +39,18 @@ func main() {
 			WriteSecret:    "bitcoin",
 			Guard: &guard.Cfg{
 				HistorySize: 1000,
+				SumTtl:      100 * time.Millisecond,
 			},
 			SubRateLimitEvery:   100 * time.Microsecond,
-			SubRateLimitBurst:   20,
+			SubRateLimitBurst:   4,
 			QueryRateLimitEvery: 100 * time.Microsecond,
-			QueryRateLimitBurst: 20,
-			Signer: &sign.BaseSignerCfg{
-				SumTtl: 100 * time.Millisecond,
-			},
+			QueryRateLimitBurst: 4,
 		},
 		App: &app.Cfg{
 			Ctx:                      ctx,
 			Commit:                   commit,
 			LaddrPort:                ":6101",
-			RateLimitEvery:           500 * time.Millisecond,
+			RateLimitEvery:           200 * time.Millisecond,
 			RateLimitBurst:           10,
 			AccessControlAllowOrigin: "*",
 		},
@@ -85,8 +82,7 @@ func main() {
 	udp.NewSvc(config.Udp)
 	app.NewApp(config.App)
 	fmt.Println("🌱 running", string(commit))
-	fmt.Println("guard history size:", config.Udp.Guard.HistorySize)
-	fmt.Println("signer sum ttl:", config.Udp.Signer.SumTtl)
+	fmt.Println("guard cfg:", config.Udp.Guard)
 	fmt.Println("read secret sha256:", secretHash(config.Udp.ReadSecret))
 	fmt.Println("write secret sha256:", secretHash(config.Udp.WriteSecret))
 	<-ctx.Done()

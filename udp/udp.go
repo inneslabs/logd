@@ -18,6 +18,20 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+type Cfg struct {
+	WorkerPoolSize      int           `yaml:"worker_pool_size"`
+	LaddrPort           string        `yaml:"laddr_port"`
+	Guard               *guard.Cfg    `yaml:"guard"`
+	ReadSecret          string        `yaml:"read_secret"`
+	WriteSecret         string        `yaml:"write_secret"`
+	SubRateLimitEvery   time.Duration `yaml:"sub_rate_limit_every"`
+	SubRateLimitBurst   int           `yaml:"sub_rate_limit_burst"`
+	QueryRateLimitEvery time.Duration `yaml:"query_rate_limit_every"`
+	QueryRateLimitBurst int           `yaml:"query_rate_limit_burst"`
+	LogStore            *store.Store
+	Ctx                 context.Context
+}
+
 const (
 	MaxPacketSize         = 1920
 	ReplyKey              = "//logd"
@@ -40,23 +54,6 @@ type UdpSvc struct {
 	pkgPool          *sync.Pool
 	workerPool       *fnpool.Pool
 	guard            *guard.Guard
-	signer           *sign.BaseSigner
-}
-
-type Cfg struct {
-	Ctx                 context.Context
-	LogStore            *store.Store
-	WorkerPoolSize      int                 `yaml:"worker_pool_size"`
-	LaddrPort           string              `yaml:"laddr_port"`
-	Guard               *guard.Cfg          `yaml:"guard"`
-	SumTtl              time.Duration       `yaml:"sum_ttl"`
-	ReadSecret          string              `yaml:"read_secret"`
-	WriteSecret         string              `yaml:"write_secret"`
-	SubRateLimitEvery   time.Duration       `yaml:"sub_rate_limit_every"`
-	SubRateLimitBurst   int                 `yaml:"sub_rate_limit_burst"`
-	QueryRateLimitEvery time.Duration       `yaml:"query_rate_limit_every"`
-	QueryRateLimitBurst int                 `yaml:"query_rate_limit_burst"`
-	Signer              *sign.BaseSignerCfg `yaml:"signer"`
 }
 
 type Sub struct {
@@ -92,14 +89,13 @@ func NewSvc(cfg *Cfg) *UdpSvc {
 		pkgPool: &sync.Pool{
 			New: func() any {
 				return &sign.Pkg{
-					Sum:       make([]byte, sign.SumLen),
-					TimeBytes: make([]byte, sign.TimeLen),
+					Sum:       make([]byte, 32), // sha256
+					TimeBytes: make([]byte, 8),  // uint64
 					Payload:   make([]byte, MaxPacketSize),
 				}
 			},
 		},
 		workerPool: fnpool.NewPool(cfg.WorkerPoolSize),
-		signer:     sign.NewBaseSigner(cfg.Signer),
 	}
 	go svc.listen()
 	go svc.kickLateSubs()

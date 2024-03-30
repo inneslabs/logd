@@ -17,11 +17,7 @@ const (
 )
 
 func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort, pkg *sign.Pkg) {
-	valid, err := svc.signer.Verify(svc.readSecret, pkg)
-	if !valid || err != nil {
-		return
-	}
-	if !svc.guard.Good(pkg.Sum) {
+	if !svc.guard.Good(svc.readSecret, pkg) {
 		return
 	}
 	svc.queryRateLimiter.Wait(svc.ctx)
@@ -31,7 +27,7 @@ func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort, pkg *sign
 	keyPrefix := query.GetKeyPrefix()
 	for log := range svc.logStore.Read(keyPrefix, offset, limit) {
 		msg := &cmd.Msg{}
-		err = proto.Unmarshal(log, msg)
+		err := proto.Unmarshal(log, msg)
 		if err != nil {
 			fmt.Println("query unmarshal protobuf err:", err)
 			return

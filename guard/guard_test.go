@@ -1,55 +1,89 @@
 package guard
 
 import (
+	"crypto/sha256"
+	"encoding/binary"
 	"testing"
+	"time"
 
+	"github.com/inneslabs/logd/sign"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewGuard(t *testing.T) {
-	cfg := &Cfg{HistorySize: 3}
+func TestGuardGood(t *testing.T) {
+	cfg := &Cfg{
+		HistorySize: 10,
+		SumTtl:      5 * time.Minute,
+	}
 	guard := NewGuard(cfg)
+	secret := []byte("secret")
+	currentTime := time.Now()
+	timeBytes, _ := currentTime.Add(-2 * time.Minute).MarshalBinary()
+	payload := []byte("payload")
+	sum := calculateSum(secret, timeBytes, payload)
 
-	assert.NotNil(t, guard)
-	assert.Equal(t, 3, guard.history.Len())
+	pkg := &sign.Pkg{
+		TimeBytes: timeBytes,
+		Payload:   payload,
+		Sum:       sum,
+	}
+
+	assert.True(t, guard.Good(secret, pkg), "Expected package to be good")
+
+	assert.False(t, guard.Good(secret, pkg), "Expected package to be rejected due to replay")
 }
 
-func TestGuard_Good_NewEntry(t *testing.T) {
-	cfg := &Cfg{HistorySize: 3}
+func TestGuardReplay(t *testing.T) {
+	cfg := &Cfg{
+		HistorySize: 2,
+		SumTtl:      5 * time.Minute,
+	}
 	guard := NewGuard(cfg)
+	secret := []byte("secret")
+	currentTime := time.Now()
+	timeBytes, _ := currentTime.MarshalBinary()
+	payload := []byte("payload")
+	sum := calculateSum(secret, timeBytes, payload)
 
-	sum := []byte("new entry")
-	isGood := guard.Good(sum)
+	pkg := &sign.Pkg{
+		TimeBytes: timeBytes,
+		Payload:   payload,
+		Sum:       sum,
+	}
 
-	assert.True(t, isGood, "Expected new entry to be considered good")
+	assert.False(t, guard.replay(sum), "Expected sum not to be found in history")
+
+	guard.Good(secret, pkg) // This should add the sum to the history
+
+	assert.True(t, guard.replay(sum), "Expected sum to be found in history due to replay")
 }
 
-func TestGuard_Good_DuplicateEntry(t *testing.T) {
-	cfg := &Cfg{HistorySize: 3}
-	guard := NewGuard(cfg)
+func TestConvertBytesToTime(t *testing.T) {
+	currentTime := time.Now()
+	timeBytes, _ := currentTime.MarshalBinary()
 
-	sum1 := []byte("entry")
-	guard.Good(sum1) // Add first entry
-
-	isGoodDuplicate := guard.Good(sum1) // Try to add it again
-
-	assert.False(t, isGoodDuplicate, "Expected duplicate entry to be considered not good")
+	convertedTime, err := convertBytesToTime(timeBytes)
+	assert.NoError(t, err, "Expected no error converting bytes to time")
+	assert.Equal(t, currentTime.Round(time.Second), convertedTime.Round(time.Second), "Expected times to be equal")
 }
 
-func TestGuard_Good_OverwriteOldestWhenFull(t *testing.T) {
-	cfg := &Cfg{HistorySize: 2}
-	guard := NewGuard(cfg)
+func TestBytesToInt64(t *testing.T) {
+	expected := int64(1234567890)
+	b := make([]byte, 8)
+	binary.BigEndian.PutUint64(b, uint64(expected))
 
-	sum1 := []byte("first")
-	sum2 := []byte("second")
-	sum3 := []byte("third")
+	result, err := bytesToInt64(b)
+	assert.NoError(t, err, "Expected no error converting bytes to int64")
+	assert.Equal(t, expected, result, "Expected int64 values to be equal")
+}
 
-	guard.Good(sum1)
-	guard.Good(sum2)
-
-	// At this point, the history is full. Adding a third entry should overwrite the first one.
-	guard.Good(sum3)
-
-	// Verify that the third entry is considered good and the first one can be added again as good.
-	assert.True(t, guard.Good(sum1), "Expected the first entry to be considered good after history is overwritten")
+// Helper function to calculate sum for testing
+func calculateSum(secret, timeBytes, payload []byte) []byte {
+	totalLen := len(secret) + len(timeBytes) + len(payload)
+	data := make([]byte, 0, totalLen)
+	data = append(data, secret...)
+	data = append(data, timeBytes...)
+	data = append(data, payload...)
+	h := sha256.Sum256(data)
+	return h[:]
 }

@@ -8,11 +8,7 @@ import (
 )
 
 func (svc *UdpSvc) handlePing(raddr netip.AddrPort, pkg *sign.Pkg) {
-	valid, err := svc.signer.Verify(svc.readSecret, pkg)
-	if !valid || err != nil {
-		return
-	}
-	if !svc.guard.Good(pkg.Sum) {
+	if !svc.guard.Good(svc.readSecret, pkg) {
 		return
 	}
 	svc.subsMu.Lock()

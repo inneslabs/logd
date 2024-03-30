@@ -10,11 +10,7 @@ import (
 )
 
 func (svc *UdpSvc) handleWrite(c *cmd.Cmd, pkg *sign.Pkg) {
-	valid, err := svc.signer.Verify(svc.writeSecret, pkg)
-	if !valid || err != nil {
-		return
-	}
-	if !svc.guard.Good(pkg.Sum) {
+	if !svc.guard.Good(svc.writeSecret, pkg) {
 		return
 	}
 	msgBytes, err := proto.Marshal(c.Msg)

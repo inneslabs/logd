@@ -16,7 +16,6 @@ import (
 type Client struct {
 	conn        net.Conn
 	rateLimiter *rate.Limiter
-	signer      *sign.BaseSigner
 }
 
 type Cfg struct {
@@ -45,16 +44,13 @@ func NewClient(cfg *Cfg) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error dialing: %w", err)
 	}
-	cl := &Client{
-		conn:   conn,
-		signer: sign.NewBaseSigner(&sign.BaseSignerCfg{}),
-	}
+	var rateLimiter *rate.Limiter
 	if cfg.RateLimitEvery > 0 {
-		cl.rateLimiter = rate.NewLimiter(
+		rateLimiter = rate.NewLimiter(
 			rate.Every(cfg.RateLimitEvery),
 			cfg.RateLimitBurst)
 	}
-	return cl, nil
+	return &Client{conn, rateLimiter}, nil
 }
 
 func (cl *Client) SignCmd(ctx context.Context, command *cmd.Cmd, secret []byte) ([]byte, error) {
@@ -62,7 +58,7 @@ func (cl *Client) SignCmd(ctx context.Context, command *cmd.Cmd, secret []byte) 
 	if err != nil {
 		return nil, fmt.Errorf("err marshalling cmd: %w", err)
 	}
-	signed, err := cl.signer.Sign(secret, payload)
+	signed, err := sign.Sign(secret, payload)
 	if err != nil {
 		return nil, fmt.Errorf("err signing cmd: %w", err)
 	}

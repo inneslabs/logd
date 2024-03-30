@@ -1,15 +1,34 @@
 # Tail & query real-time logs of many apps.
-A simple protocol for log data, built on Protobuf, SHA256, and UDP.
-Currently, there is only a map of ring buffers in memory.
+A simple program for streaming log data, built on Protobuf, SHA256, and UDP.
+
 This program does not yet write log data to a file, although this is clearly an important feature to come.
 ```bash
 go run .
 ```
 
-# To Do
-## Fix replay-attack vulnerability
-There is currently no cache of UDP packet hashes, so we can't yet detect & drop a replay. A small ring buffer would be ideal for this.
-`Estimated time: 2 hours`
+# Config
+The program will search up to the root for a file named `logdrc.yml`.
+```yaml
+# logdrc.yml
+udp:
+  laddr_port: ":6102"
+  guard:
+    history_size: 10000
+    sum_ttl: 100ms
+app:
+  laddr_port: ":6101"
+store:
+  ring_sizes:
+    /prod/my/app/http: 1000000
+    /prod/my/app/udp: 1000000
+    /debug: 10000
+  fallback_size: 1000000
+```
+You may set your secrets in here, or as env vars.
+```bash
+export LOGD_READ_SECRET = "123456"
+export LOGD_WRITE_SECRET = "123456"
+```
 
 # Auth
 Logd authenticates clients for either reading or writing using SHA256 hash-based message authentication.
