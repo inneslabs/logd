@@ -21,6 +21,14 @@ func (client *Client) Cmd(ctx context.Context, command *cmd.Cmd, secret []byte) 
 	if client.rateLimiter != nil {
 		client.rateLimiter.Wait(ctx)
 	}
-	client.conn.Write(signed)
-	return nil
+	_, err = client.conn.Write(signed)
+	return err
+}
+
+func (client *Client) Write(ctx context.Context, signedPacket []byte) error {
+	if client.rateLimiter != nil {
+		client.rateLimiter.Wait(ctx)
+	}
+	_, err := client.conn.Write(signedPacket)
+	return err
 }
