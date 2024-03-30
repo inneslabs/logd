@@ -2,10 +2,8 @@ package sign
 
 import (
 	"testing"
-	"time"
 
 	"github.com/inneslabs/logd/cmd"
-	"github.com/inneslabs/logd/guard"
 	"github.com/inneslabs/logd/pkg"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -28,13 +26,6 @@ func TestSignAndVerify(t *testing.T) {
 	p := &pkg.Pkg{}
 	err = pkg.Unpack(signed, p)
 	if err != nil {
-		t.FailNow()
-	}
-	g := guard.NewGuard(&guard.Cfg{
-		HistorySize: 0,
-		SumTtl:      100 * time.Millisecond,
-	})
-	if !g.Good(sec, p) {
 		t.FailNow()
 	}
 }

@@ -8,9 +8,9 @@ import (
 )
 
 type Store struct {
-	rings     map[string]*ring.Ring
-	fallback  *ring.Ring
-	numWrites atomic.Uint64
+	rings    map[string]*ring.Ring
+	fallback *ring.Ring
+	nWrites  atomic.Uint64
 }
 
 type Cfg struct {
@@ -31,7 +31,7 @@ func NewStore(cfg *Cfg) *Store {
 
 // Write writes to the ring of key, or fallback ring
 func (s *Store) Write(key string, data []byte) {
-	s.numWrites.Add(uint64(1))
+	s.nWrites.Add(uint64(1))
 	part := s.rings[key]
 	if part == nil {
 		s.fallback.Write(data)
@@ -64,7 +64,6 @@ func (s *Store) Read(keyPrefix string, offset, limit uint32) <-chan []byte {
 	out := make(chan []byte, 1)
 	go func() {
 		defer close(out)
-		// try to read from exact ring
 		exactRing := s.rings[keyPrefix]
 		if exactRing != nil {
 			for d := range exactRing.Read(offset, limit) {
@@ -74,7 +73,6 @@ func (s *Store) Read(keyPrefix string, offset, limit uint32) <-chan []byte {
 		}
 		var count uint32
 		var matchedPrefix bool
-		// ranging through rings for prefix
 		for key, r := range s.rings {
 			if strings.HasPrefix(key, keyPrefix) {
 				matchedPrefix = true
@@ -88,7 +86,6 @@ func (s *Store) Read(keyPrefix string, offset, limit uint32) <-chan []byte {
 			}
 		}
 		if !matchedPrefix {
-			// fallback
 			for d := range s.fallback.Read(offset, limit) {
 				out <- d
 			}
@@ -97,6 +94,6 @@ func (s *Store) Read(keyPrefix string, offset, limit uint32) <-chan []byte {
 	return out
 }
 
-func (s *Store) NumWrites() uint64 {
-	return s.numWrites.Load()
+func (s *Store) NWrites() uint64 {
+	return s.nWrites.Load()
 }

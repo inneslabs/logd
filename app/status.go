@@ -20,14 +20,14 @@ type Status struct {
 }
 
 type MachineInfo struct {
-	NumCpu int `json:"numCpu"`
+	NCpu     int    `json:"ncpu"`
+	MemAlloc uint64 `json:"mem_alloc"`
 }
 
 type StoreInfo struct {
-	Writes uint64 `json:"writes"`
-	// iterables are easier than maps in JS
-	Rings          []*RingInfo `json:"rings"`
-	MaxWritePerSec uint64      `json:"maxWritePerSec"`
+	NWrites uint64      `json:"nwrites"`
+	Rings   []*RingInfo `json:"rings"`
+	MaxRate uint64      `json:"max_rate"`
 }
 
 type RingInfo struct {
@@ -43,25 +43,24 @@ func (app *App) handleStatus(w http.ResponseWriter) {
 }
 
 func (app *App) measureStatus() {
-	numCpu := runtime.NumCPU()
+	ncpu := runtime.NumCPU()
 	lastWrites := uint64(0)
 	lastTime := time.Now()
-	maxWritePerSec := uint64(0)
+	maxRate := uint64(0)
 
 	for {
 		select {
 		case <-time.After(time.Second):
-			writes := app.logStore.NumWrites()
+			writes := app.logStore.NWrites()
 			delta := writes - lastWrites
 			timeDelta := time.Since(lastTime).Seconds()
-			writePerSec := uint64(float64(delta) / timeDelta)
-			if writePerSec > maxWritePerSec {
-				maxWritePerSec = writePerSec
+			rate := uint64(float64(delta) / timeDelta)
+			if rate > maxRate {
+				maxRate = rate
 			}
 			lastWrites = writes
 			lastTime = time.Now()
 
-			// build log store rings report
 			heads := app.logStore.Heads()
 			sizes := app.logStore.Sizes()
 			rings := make([]*RingInfo, 0, len(heads))
@@ -76,16 +75,20 @@ func (app *App) measureStatus() {
 				return rings[i].Key < rings[j].Key
 			})
 
+			memStats := &runtime.MemStats{}
+			runtime.ReadMemStats(memStats)
+
 			info := &Status{
 				Commit: app.commit,
 				Uptime: jfmt.FmtDuration(time.Since(app.started)),
 				Machine: &MachineInfo{
-					NumCpu: numCpu,
+					NCpu:     ncpu,
+					MemAlloc: memStats.Alloc,
 				},
 				Store: &StoreInfo{
-					Writes:         writes,
-					Rings:          rings,
-					MaxWritePerSec: maxWritePerSec,
+					NWrites: writes,
+					Rings:   rings,
+					MaxRate: maxRate,
 				},
 			}
 

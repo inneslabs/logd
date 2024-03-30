@@ -78,8 +78,3 @@ func (b *Ring) Read(offset, limit uint32) <-chan []byte {
 func (b *Ring) Head() uint32 {
 	return b.head.Load()
 }
-
-// Returns the record {index} slots ahead of head (oldest first)
-func (b *Ring) ReadOne(index uint32) []byte {
-	return b.values[index%b.size]
-}

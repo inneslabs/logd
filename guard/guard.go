@@ -58,26 +58,20 @@ func (g *Guard) replay(sum []byte) bool {
 	return found
 }
 
-// Verify signed payload
 func (g *Guard) verify(secret []byte, p *pkg.Pkg) (bool, error) {
 	var t time.Time
 	err := t.UnmarshalBinary(p.TimeBytes)
 	if err != nil {
 		return false, fmt.Errorf("convert bytes to time err: %w", err)
 	}
-	// verify timestamp is within threshold
 	if t.After(time.Now()) || t.Before(time.Now().Add(-g.sumTtl)) {
 		return false, errors.New("time is outside of threshold")
 	}
-	// pre-allocate slice
 	totalLen := len(secret) + len(p.TimeBytes) + len(p.Payload)
 	data := make([]byte, 0, totalLen)
-	// copy data
 	data = append(data, secret...)
 	data = append(data, p.TimeBytes...)
 	data = append(data, p.Payload...)
-	// compute checksum
 	h := sha256.Sum256(data)
-	// verify equality
 	return bytes.Equal(p.Sum, h[:32]), nil
 }
