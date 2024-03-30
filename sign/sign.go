@@ -6,10 +6,9 @@ import (
 )
 
 func Sign(secret, payload []byte) []byte {
-	timeBytes, _ := time.Now().MarshalBinary()
+	timeBytes, _ := time.Now().MarshalBinary() // 15 bytes
 	// pre-allocate slice
-	totalLen := 32 + 8 + len(payload)
-	data := make([]byte, 0, totalLen)
+	data := make([]byte, 0, 32 /* sha256 */ +15 /* time */ +len(payload))
 	// copy data
 	data = append(data, secret...)
 	data = append(data, timeBytes...)

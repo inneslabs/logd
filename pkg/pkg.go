@@ -11,11 +11,11 @@ type Pkg struct {
 }
 
 func Unpack(data []byte, pkg *Pkg) error {
-	if len(data) < 32+8 {
+	if len(data) < 32+15 {
 		return errors.New("data too short")
 	}
-	pkg.Sum = data[:32]
-	pkg.TimeBytes = data[32 : 32+8]
-	pkg.Payload = data[32+8:]
+	pkg.Sum = data[:32]              /*32B sha256*/
+	pkg.TimeBytes = data[32 : 32+15] /*15B time*/
+	pkg.Payload = data[32+15:]
 	return nil
 }
