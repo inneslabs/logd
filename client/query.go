@@ -10,16 +10,24 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func (c *Client) Query(ctx context.Context, q *cmd.QueryParams, secret []byte) (<-chan *cmd.Msg, error) {
-	err := c.Cmd(ctx, &cmd.Cmd{
+func (cl *Client) Query(ctx context.Context, q *cmd.QueryParams, secret []byte) (<-chan *cmd.Msg, error) {
+	signed, err := SignCmd(ctx, &cmd.Cmd{
 		Name:        cmd.Name_QUERY,
 		QueryParams: q,
 	}, secret)
 	if err != nil {
 		return nil, err
 	}
+	err = cl.Wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = cl.Write(signed)
+	if err != nil {
+		return nil, err
+	}
 	out := make(chan *cmd.Msg)
-	go c.readQueryMsgs(out)
+	go cl.readQueryMsgs(out)
 	return out, nil
 }
 

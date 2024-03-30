@@ -10,26 +10,44 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func (c *Client) Tail(ctx context.Context, q *cmd.QueryParams, secret []byte) (<-chan *cmd.Msg, error) {
-	err := c.Cmd(ctx, &cmd.Cmd{
+func (cl *Client) Tail(ctx context.Context, q *cmd.QueryParams, secret []byte) (<-chan *cmd.Msg, error) {
+	signed, err := SignCmd(ctx, &cmd.Cmd{
 		Name:        cmd.Name_TAIL,
 		QueryParams: q,
 	}, secret)
 	if err != nil {
-		return nil, fmt.Errorf("err sending tail cmd: %w", err)
+		return nil, err
+	}
+	err = cl.Wait(ctx)
+	if err != nil {
+		return nil, err
+	}
+	err = cl.Write(signed)
+	if err != nil {
+		return nil, err
 	}
 	fmt.Printf("\rsent tail cmd\033[0K")
 	out := make(chan *cmd.Msg)
-	go c.readTailMsgs(out)
-	go func() {
-		for {
-			time.Sleep(udp.PingPeriod)
-			c.Cmd(ctx, &cmd.Cmd{
-				Name: cmd.Name_PING,
-			}, secret)
-		}
-	}()
+	go cl.readTailMsgs(out)
+	go cl.ping(ctx, secret)
 	return out, nil
+}
+
+func (cl *Client) ping(ctx context.Context, secret []byte) {
+	for {
+		time.Sleep(udp.PingPeriod)
+		signed, err := SignCmd(ctx, &cmd.Cmd{
+			Name: cmd.Name_PING,
+		}, secret)
+		if err != nil {
+			panic(err)
+		}
+		cl.Wait(ctx)
+		err = cl.Write(signed)
+		if err != nil {
+			panic(err)
+		}
+	}
 }
 
 func (c *Client) readTailMsgs(out chan<- *cmd.Msg) {

@@ -1,12 +1,16 @@
 package client
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"strconv"
 	"time"
 
+	"github.com/inneslabs/logd/auth"
+	"github.com/inneslabs/logd/cmd"
 	"golang.org/x/time/rate"
+	"google.golang.org/protobuf/proto"
 )
 
 type Client struct {
@@ -49,4 +53,31 @@ func NewClient(cfg *Cfg) (*Client, error) {
 			cfg.RateLimitBurst)
 	}
 	return cl, nil
+}
+
+func SignCmd(ctx context.Context, command *cmd.Cmd, secret []byte) ([]byte, error) {
+	payload, err := proto.Marshal(command)
+	if err != nil {
+		return nil, fmt.Errorf("err marshalling cmd: %w", err)
+	}
+	signed, err := auth.Sign(secret, payload)
+	if err != nil {
+		return nil, fmt.Errorf("err signing cmd: %w", err)
+	}
+	return signed, nil
+}
+
+func (cl *Client) Wait(ctx context.Context) error {
+	if cl.rateLimiter != nil {
+		return cl.rateLimiter.Wait(ctx)
+	}
+	return nil
+}
+
+func (cl *Client) Write(signed []byte) error {
+	_, err := cl.conn.Write(signed)
+	if err != nil {
+		return fmt.Errorf("err writing to socket: %w", err)
+	}
+	return nil
 }

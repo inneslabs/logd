@@ -40,7 +40,7 @@ func NewLogger(ctx context.Context, cfg *LoggerCfg) (*Logger, error) {
 
 func (l *Logger) Log(lvl *cmd.Lvl, template string, args ...interface{}) {
 	txt := fmt.Sprintf(template, args...)
-	l.client.Cmd(l.ctx, &cmd.Cmd{
+	signed, _ := client.SignCmd(l.ctx, &cmd.Cmd{
 		Name: cmd.Name_WRITE,
 		Msg: &cmd.Msg{
 			T:   timestamppb.Now(),
@@ -49,6 +49,8 @@ func (l *Logger) Log(lvl *cmd.Lvl, template string, args ...interface{}) {
 			Txt: &txt,
 		},
 	}, l.secret)
+	l.client.Wait(l.ctx)
+	l.client.Write(signed)
 	if l.stdout {
 		fmt.Printf(template+"\n", args...)
 	}
