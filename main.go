@@ -12,6 +12,7 @@ import (
 	"github.com/inneslabs/cfg"
 	"github.com/inneslabs/logd/app"
 	"github.com/inneslabs/logd/guard"
+	"github.com/inneslabs/logd/sign"
 	"github.com/inneslabs/logd/store"
 	"github.com/inneslabs/logd/udp"
 	//_ "net/http/pprof"
@@ -46,6 +47,9 @@ func main() {
 			SubRateLimitBurst:   20,
 			QueryRateLimitEvery: 100 * time.Microsecond,
 			QueryRateLimitBurst: 20,
+			Signer: &sign.BaseSignerCfg{
+				SumTtl: 100 * time.Millisecond,
+			},
 		},
 		App: &app.Cfg{
 			Ctx:                      ctx,
