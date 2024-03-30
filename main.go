@@ -69,7 +69,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	secrets, err := os.ReadFile("logd_secrets.yml")
+	secrets, err := os.ReadFile("secrets.yml")
 	if err == nil {
 		err = yaml.Unmarshal(secrets, config.Udp.Secrets)
 		if err != nil {
