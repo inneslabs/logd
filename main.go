@@ -31,6 +31,7 @@ func main() {
 	if err != nil {
 		fmt.Println("failed to read commit file:", err)
 	}
+	fmt.Println("🌱 running", string(commit))
 	config := &Cfg{
 		Udp: &udp.Cfg{
 			Ctx:            ctx,
@@ -69,13 +70,15 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
-	secrets, err := os.ReadFile("secrets.yml")
+	secYml, err := os.ReadFile("secrets.yml")
 	if err == nil {
-		err = yaml.Unmarshal(secrets, config.Udp.Secrets)
+		sec := &udp.Secrets{}
+		err = yaml.Unmarshal(secYml, sec)
 		if err != nil {
-			fmt.Println("err parsing logd_secrets.yml:", err)
+			panic(err)
 		} else {
-			fmt.Println("secrets loaded from logd_secrets.yml")
+			config.Udp.Secrets = sec
+			fmt.Println("secrets loaded from secrets.yml")
 		}
 	}
 	logStore := store.NewStore(config.Store)
@@ -83,10 +86,9 @@ func main() {
 	config.Udp.LogStore = logStore
 	udp.NewSvc(config.Udp)
 	app.NewApp(config.App)
-	fmt.Println("🌱 running", string(commit))
-	fmt.Println("guard cfg:", config.Udp.Guard)
 	fmt.Println("read secret sha256:", secretHash(config.Udp.Secrets.Read))
 	fmt.Println("write secret sha256:", secretHash(config.Udp.Secrets.Write))
+	fmt.Printf("guard: %+v\n", config.Udp.Guard)
 	<-ctx.Done()
 	fmt.Println("all routines ended")
 }
