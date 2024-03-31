@@ -17,11 +17,12 @@ func (svc *UdpSvc) handleWrite(c *cmd.Cmd, p *pkg.Pkg) {
 	if err != nil {
 		return
 	}
-	msgKey := c.Msg.GetKey()
-	segments := strings.Split(msgKey, "/")
+	segments := strings.Split(c.Msg.GetKey(), "/")
 	if len(segments) < 3 {
 		return
 	}
+	// IMPORTANT:
+	// This is currently how msg keys are mapped to the rings
 	storeKey := fmt.Sprintf("/%s/%s", segments[1], segments[2])
 	svc.logStore.Write(storeKey, msgBytes)
 	svc.forSubs <- &ProtoPair{
