@@ -22,6 +22,7 @@ type Status struct {
 type MachineInfo struct {
 	NCpu     int    `json:"ncpu"`
 	MemAlloc uint64 `json:"mem_alloc"`
+	MemSys   uint64 `json:"mem_sys"`
 }
 
 type StoreInfo struct {
@@ -83,7 +84,8 @@ func (app *App) measureStatus() {
 				Uptime: jfmt.FmtDuration(time.Since(app.started)),
 				Machine: &MachineInfo{
 					NCpu:     ncpu,
-					MemAlloc: memStats.Alloc,
+					MemAlloc: memStats.HeapAlloc,
+					MemSys:   memStats.Sys,
 				},
 				Store: &StoreInfo{
 					NWrites: writes,
