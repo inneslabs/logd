@@ -45,9 +45,9 @@ func main() {
 				HistorySize: 1000,
 				SumTtl:      100 * time.Millisecond,
 			},
-			SubRateLimitEvery:   100 * time.Microsecond,
+			SubRateLimitEvery:   50 * time.Microsecond,
 			SubRateLimitBurst:   4,
-			QueryRateLimitEvery: 100 * time.Microsecond,
+			QueryRateLimitEvery: 50 * time.Microsecond,
 			QueryRateLimitBurst: 4,
 		},
 		App: &app.Cfg{
