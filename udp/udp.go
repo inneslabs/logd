@@ -23,8 +23,8 @@ type Cfg struct {
 	LaddrPort           string        `yaml:"laddr_port"`
 	Guard               *guard.Cfg    `yaml:"guard"`
 	Secrets             *Secrets      `yaml:"secrets"`
-	SubRateLimitEvery   time.Duration `yaml:"sub_rate_limit_every"`
-	SubRateLimitBurst   int           `yaml:"sub_rate_limit_burst"`
+	TailRateLimitEvery  time.Duration `yaml:"tail_rate_limit_every"`
+	TailRateLimitBurst  int           `yaml:"tail_rate_limit_burst"`
 	QueryRateLimitEvery time.Duration `yaml:"query_rate_limit_every"`
 	QueryRateLimitBurst int           `yaml:"query_rate_limit_burst"`
 	LogStore            *store.Store
@@ -37,32 +37,36 @@ type Secrets struct {
 }
 
 const (
-	MaxPacketSize         = 1920
+	MaxPacketSize         = 1024
 	ReplyKey              = "//logd"
 	PingPeriod            = time.Second * 2
 	KickAfterMissingPings = 3
 )
 
 type UdpSvc struct {
-	ctx              context.Context
-	laddrPort        string
-	conn             *net.UDPConn
-	subs             map[string]*Sub
-	subsMu           sync.RWMutex
-	forSubs          chan *ProtoPair
-	subRateLimiter   *rate.Limiter
-	queryRateLimiter *rate.Limiter
-	secrets          *Secrets
-	logStore         *store.Store
-	pkgPool          *sync.Pool
-	workerPool       *fnpool.Pool
-	guard            *guard.Guard
+	ctx                 context.Context
+	laddrPort           string
+	conn                *net.UDPConn
+	tails               map[string]*Tail
+	ping                chan string
+	newTail             chan *Tail
+	forSubs             chan *ProtoPair
+	tailRateLimit       rate.Limit
+	queryRateLimit      rate.Limit
+	tailRateLimitBurst  int
+	queryRateLimitBurst int
+	secrets             *Secrets
+	logStore            *store.Store
+	pkgPool             *sync.Pool
+	workerPool          *fnpool.Pool
+	guard               *guard.Guard
 }
 
-type Sub struct {
+type Tail struct {
 	raddr       netip.AddrPort
 	lastPing    time.Time
 	queryParams *cmd.QueryParams
+	rateLimiter *rate.Limiter
 }
 
 type Packet struct {
@@ -77,17 +81,19 @@ type ProtoPair struct {
 
 func NewSvc(cfg *Cfg) *UdpSvc {
 	svc := &UdpSvc{
-		ctx:       cfg.Ctx,
-		laddrPort: cfg.LaddrPort,
-		guard:     guard.NewGuard(cfg.Guard),
-		subs:      make(map[string]*Sub),
-		subsMu:    sync.RWMutex{},
-		// increased buffer size from 4 (2024-02-11)
-		forSubs:          make(chan *ProtoPair, 100),
-		subRateLimiter:   rate.NewLimiter(rate.Every(cfg.SubRateLimitEvery), cfg.SubRateLimitBurst),
-		queryRateLimiter: rate.NewLimiter(rate.Every(cfg.QueryRateLimitEvery), cfg.QueryRateLimitBurst),
-		secrets:          cfg.Secrets,
-		logStore:         cfg.LogStore,
+		ctx:                 cfg.Ctx,
+		laddrPort:           cfg.LaddrPort,
+		guard:               guard.NewGuard(cfg.Guard),
+		tails:               make(map[string]*Tail),
+		forSubs:             make(chan *ProtoPair, 1),
+		ping:                make(chan string, 1),
+		newTail:             make(chan *Tail, 1),
+		tailRateLimit:       rate.Every(cfg.TailRateLimitEvery),
+		queryRateLimit:      rate.Every(cfg.QueryRateLimitEvery),
+		tailRateLimitBurst:  cfg.TailRateLimitBurst,
+		queryRateLimitBurst: cfg.QueryRateLimitBurst,
+		secrets:             cfg.Secrets,
+		logStore:            cfg.LogStore,
 		pkgPool: &sync.Pool{
 			New: func() any {
 				return &pkg.Pkg{
@@ -100,8 +106,7 @@ func NewSvc(cfg *Cfg) *UdpSvc {
 		workerPool: fnpool.NewPool(cfg.WorkerPoolSize),
 	}
 	go svc.listen()
-	go svc.kickLateSubs()
-	go svc.writeToSubs()
+	go svc.tailReadWrite()
 	return svc
 }
 
@@ -134,54 +139,76 @@ func (svc *UdpSvc) readPacket() {
 	if err != nil {
 		return
 	}
-	svc.handlePacket(&Packet{
-		Data:  buf[:n],
-		Raddr: raddr,
-	})
+	p, _ := svc.pkgPool.Get().(*pkg.Pkg)
+	err = pkg.Unpack(buf[:n], p)
+	if err != nil {
+		return
+	}
+	c := &cmd.Cmd{}
+	err = proto.Unmarshal(p.Payload, c)
+	if err != nil {
+		return
+	}
+	switch c.GetName() {
+	case cmd.Name_WRITE:
+		if !svc.guard.Good([]byte(svc.secrets.Write), p) {
+			break
+		}
+		svc.handleWrite(c)
+	case cmd.Name_TAIL:
+		if !svc.guard.Good([]byte(svc.secrets.Read), p) {
+			break
+		}
+		svc.newTail <- &Tail{
+			raddr:       raddr,
+			lastPing:    time.Now(),
+			queryParams: c.GetQueryParams(),
+			rateLimiter: rate.NewLimiter(svc.tailRateLimit, svc.tailRateLimitBurst),
+		}
+		svc.reply("\rtailing logs\033[0K", raddr)
+		fmt.Println("got new tail", raddr.String())
+	case cmd.Name_PING:
+		if !svc.guard.Good([]byte(svc.secrets.Read), p) {
+			break
+		}
+		svc.ping <- raddr.String()
+	case cmd.Name_QUERY:
+		if svc.guard.Good([]byte(svc.secrets.Read), p) {
+			svc.handleQuery(c, raddr)
+		}
+	}
+	svc.pkgPool.Put(p)
 }
 
-func (svc *UdpSvc) handlePacket(packet *Packet) {
-	svc.workerPool.Dispatch(func() {
-		p, _ := svc.pkgPool.Get().(*pkg.Pkg)
-		err := pkg.Unpack(packet.Data, p)
-		if err != nil {
-			return
-		}
-		c := &cmd.Cmd{}
-		err = proto.Unmarshal(p.Payload, c)
-		if err != nil {
-			return
-		}
-		switch c.GetName() {
-		case cmd.Name_WRITE:
-			svc.handleWrite(c, p)
-		case cmd.Name_TAIL:
-			svc.handleTail(c, packet.Raddr, p)
-		case cmd.Name_PING:
-			svc.handlePing(packet.Raddr, p)
-		case cmd.Name_QUERY:
-			svc.handleQuery(c, packet.Raddr, p)
-		}
-		svc.pkgPool.Put(p)
-	})
-}
-
-func (svc *UdpSvc) writeToSubs() {
+func (svc *UdpSvc) tailReadWrite() {
 	for {
 		select {
 		case protoPair := <-svc.forSubs:
-			svc.subsMu.RLock()
-			for raddr, sub := range svc.subs {
-				if !shouldSendToSub(sub, protoPair.Msg) {
+			for raddr, tail := range svc.tails {
+				if !shouldSendToTail(tail, protoPair.Msg) {
 					continue
 				}
-				svc.subRateLimiter.Wait(svc.ctx)
-				_, err := svc.conn.WriteToUDPAddrPort(protoPair.Bytes, sub.raddr)
+				tail.rateLimiter.Wait(svc.ctx)
+				_, err := svc.conn.WriteToUDPAddrPort(protoPair.Bytes, tail.raddr)
 				if err != nil {
 					fmt.Printf("write udp err: (%s) %s\n", raddr, err)
 				}
 			}
-			svc.subsMu.RUnlock()
+		case ping := <-svc.ping:
+			tail, ok := svc.tails[ping]
+			if ok {
+				tail.lastPing = time.Now()
+			}
+		case newTail := <-svc.newTail:
+			svc.tails[newTail.raddr.String()] = newTail
+		case <-time.After(PingPeriod):
+			for _, tail := range svc.tails {
+				if tail.lastPing.Before(time.Now().Add(-(PingPeriod * KickAfterMissingPings))) {
+					delete(svc.tails, tail.raddr.String())
+					fmt.Printf("kicked %s\n", tail.raddr.String())
+					svc.reply("kick", tail.raddr)
+				}
+			}
 		case <-svc.ctx.Done():
 			fmt.Println("writeToSubs ended")
 			return
@@ -189,22 +216,14 @@ func (svc *UdpSvc) writeToSubs() {
 	}
 }
 
-func shouldSendToSub(sub *Sub, msg *cmd.Msg) bool {
-	if sub.queryParams != nil {
-		keyPrefix := sub.queryParams.GetKeyPrefix()
+func shouldSendToTail(tail *Tail, msg *cmd.Msg) bool {
+	if tail.queryParams != nil {
+		keyPrefix := tail.queryParams.GetKeyPrefix()
 		if keyPrefix != "" && !strings.HasPrefix(msg.GetKey(), keyPrefix) {
 			return false
 		}
-		qLvl := sub.queryParams.GetLvl()
+		qLvl := tail.queryParams.GetLvl()
 		if qLvl != cmd.Lvl_LVL_UNKNOWN && qLvl > msg.GetLvl() {
-			return false
-		}
-		qResponseStatus := sub.queryParams.GetResponseStatus()
-		if qResponseStatus != 0 && qResponseStatus != msg.GetResponseStatus() {
-			return false
-		}
-		qUrl := sub.queryParams.GetUrl()
-		if qUrl != "" && !strings.HasPrefix(msg.GetUrl(), qUrl) {
 			return false
 		}
 	}
@@ -214,28 +233,7 @@ func shouldSendToSub(sub *Sub, msg *cmd.Msg) bool {
 func (svc *UdpSvc) reply(txt string, raddr netip.AddrPort) {
 	payload, _ := proto.Marshal(&cmd.Msg{
 		Key: ReplyKey,
-		Txt: &txt,
+		Txt: txt,
 	})
-	svc.subRateLimiter.Wait(svc.ctx)
 	svc.conn.WriteToUDPAddrPort(payload, raddr)
-}
-
-func (svc *UdpSvc) kickLateSubs() {
-	for {
-		select {
-		case <-time.After(PingPeriod):
-			for _, sub := range svc.subs {
-				if sub.lastPing.Before(time.Now().Add(-(PingPeriod * KickAfterMissingPings))) {
-					svc.subsMu.Lock()
-					delete(svc.subs, sub.raddr.String())
-					svc.subsMu.Unlock()
-					fmt.Printf("kicked %s\n", sub.raddr.String())
-					svc.reply("kick", sub.raddr)
-				}
-			}
-		case <-svc.ctx.Done():
-			fmt.Println("kickLateSubs ended")
-			return
-		}
-	}
 }

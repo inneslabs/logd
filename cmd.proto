@@ -12,12 +12,8 @@ message Cmd {
 
 message Msg {
   google.protobuf.Timestamp t = 1;
-  optional Lvl lvl = 6;
-  optional string txt = 7;
-  optional string stackTrace = 8;
-  optional HttpMethod httpMethod = 9;
-  optional string url = 10;
-  optional int32 responseStatus = 11;
+  Lvl lvl = 6;
+  string txt = 7;
   string key = 12;
 }
 
@@ -27,10 +23,6 @@ message QueryParams {
   optional google.protobuf.Timestamp tStart = 3;
   optional google.protobuf.Timestamp tEnd = 4;
   optional Lvl lvl = 8;
-  optional string txt = 9;
-  optional HttpMethod httpMethod = 10;
-  optional string url = 11;
-  optional int32 responseStatus = 12;
   optional string keyPrefix = 13;
 }
 
@@ -50,15 +42,3 @@ enum Lvl {
   ERROR = 5;
   FATAL = 6;
 }
-
-enum HttpMethod {
-  METHOD_UNKNOWN = 0;
-  DELETE = 1;
-  GET = 2;
-  HEAD = 3;
-  OPTIONS = 4;
-  PATCH = 5;
-  POST = 6;
-  PUT = 7;
-}
-

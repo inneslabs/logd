@@ -38,7 +38,7 @@ func NewLogger(ctx context.Context, cfg *LoggerCfg) (*Logger, error) {
 	}, nil
 }
 
-func (l *Logger) Log(lvl *cmd.Lvl, template string, args ...interface{}) {
+func (l *Logger) Log(lvl cmd.Lvl, template string, args ...interface{}) {
 	txt := fmt.Sprintf(template, args...)
 	signed, _ := l.client.SignCmd(l.ctx, &cmd.Cmd{
 		Name: cmd.Name_WRITE,
@@ -46,7 +46,7 @@ func (l *Logger) Log(lvl *cmd.Lvl, template string, args ...interface{}) {
 			T:   timestamppb.Now(),
 			Key: l.msgKey,
 			Lvl: lvl,
-			Txt: &txt,
+			Txt: txt,
 		},
 	}, l.secret)
 	l.client.Wait(l.ctx)
@@ -57,21 +57,21 @@ func (l *Logger) Log(lvl *cmd.Lvl, template string, args ...interface{}) {
 }
 
 func (l *Logger) Error(template string, args ...interface{}) {
-	l.Log(cmd.Lvl_ERROR.Enum(), template, args...)
+	l.Log(cmd.Lvl_ERROR, template, args...)
 }
 
 func (l *Logger) Warn(template string, args ...interface{}) {
-	l.Log(cmd.Lvl_WARN.Enum(), template, args...)
+	l.Log(cmd.Lvl_WARN, template, args...)
 }
 
 func (l *Logger) Info(template string, args ...interface{}) {
-	l.Log(cmd.Lvl_INFO.Enum(), template, args...)
+	l.Log(cmd.Lvl_INFO, template, args...)
 }
 
 func (l *Logger) Debug(template string, args ...interface{}) {
-	l.Log(cmd.Lvl_DEBUG.Enum(), template, args...)
+	l.Log(cmd.Lvl_DEBUG, template, args...)
 }
 
 func (l *Logger) Trace(template string, args ...interface{}) {
-	l.Log(cmd.Lvl_TRACE.Enum(), template, args...)
+	l.Log(cmd.Lvl_TRACE, template, args...)
 }

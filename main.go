@@ -45,8 +45,8 @@ func main() {
 				HistorySize: 1000,
 				SumTtl:      100 * time.Millisecond,
 			},
-			SubRateLimitEvery:   50 * time.Microsecond,
-			SubRateLimitBurst:   4,
+			TailRateLimitEvery:  50 * time.Microsecond,
+			TailRateLimitBurst:  4,
 			QueryRateLimitEvery: 50 * time.Microsecond,
 			QueryRateLimitBurst: 4,
 		},
@@ -62,13 +62,9 @@ func main() {
 			FallbackSize: 100000,
 		},
 	}
-	wd, err := os.Getwd()
+	err = cfg.Load("logdrc.yml", "/etc", config)
 	if err != nil {
-		panic(err)
-	}
-	err = cfg.Load("logdrc.yml", wd, config)
-	if err != nil {
-		panic(err)
+		fmt.Println("no config file loaded")
 	}
 	secYml, err := os.ReadFile("secrets.yml")
 	if err == nil {

@@ -10,19 +10,17 @@ import (
 )
 
 func TestSignAndVerify(t *testing.T) {
-	sec := []byte("testsecret")
-	txt := "this is a test"
 	payload, err := proto.Marshal(&cmd.Cmd{
 		Name: cmd.Name_WRITE,
 		Msg: &cmd.Msg{
 			T:   timestamppb.Now(),
-			Txt: &txt,
+			Txt: "this is a test",
 		},
 	})
 	if err != nil {
 		t.FailNow()
 	}
-	signed := Sign(sec, payload)
+	signed := Sign([]byte("testsecret"), payload)
 	p := &pkg.Pkg{}
 	err = pkg.Unpack(signed, p)
 	if err != nil {
@@ -31,12 +29,11 @@ func TestSignAndVerify(t *testing.T) {
 }
 
 func BenchmarkSign(b *testing.B) {
-	txt := "test"
 	payload, err := proto.Marshal(&cmd.Cmd{
 		Name: cmd.Name_WRITE,
 		Msg: &cmd.Msg{
 			T:   timestamppb.Now(),
-			Txt: &txt,
+			Txt: "test",
 		},
 	})
 	if err != nil {

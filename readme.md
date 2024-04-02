@@ -78,7 +78,12 @@ socket.Write(signedMsg)
 ```
 
 # Protobuf
-Generate protobuf code
+If you modify the protobuf spec in `cmd.proto`, you must re-generate the code.
 ```bash
-protoc --go_out=. cmd.proto # generate source files
+# install protobuf & gen-go
+brew install protobuf
+brew install protoc-gen-go
+
+# generate protobuf source files
+protoc --go_out=. cmd.proto
 ```

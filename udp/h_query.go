@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/inneslabs/logd/cmd"
-	"github.com/inneslabs/logd/pkg"
+	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -16,15 +16,12 @@ const (
 	EndMsg    = "+END"
 )
 
-func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort, p *pkg.Pkg) {
-	if !svc.guard.Good([]byte(svc.secrets.Read), p) {
-		return
-	}
-	svc.queryRateLimiter.Wait(svc.ctx)
+func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort) {
 	query := command.GetQueryParams()
 	offset := query.GetOffset()
 	limit := limit(query.GetLimit())
 	keyPrefix := query.GetKeyPrefix()
+	rateLimit := rate.NewLimiter(svc.queryRateLimit, svc.queryRateLimitBurst)
 	for log := range svc.logStore.Read(keyPrefix, offset, limit) {
 		msg := &cmd.Msg{}
 		err := proto.Unmarshal(log, msg)
@@ -33,7 +30,7 @@ func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort, p *pkg.Pk
 			return
 		}
 		if matchMsg(msg, query) {
-			err := svc.subRateLimiter.Wait(svc.ctx)
+			err := rateLimit.Wait(svc.ctx)
 			if err != nil {
 				return
 			}
@@ -44,6 +41,7 @@ func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort, p *pkg.Pk
 		}
 	}
 	time.Sleep(time.Millisecond * 10) // ensure +END arrives last
+	rateLimit.Wait(svc.ctx)
 	svc.reply(EndMsg, raddr)
 }
 
@@ -55,10 +53,6 @@ func matchMsg(msg *cmd.Msg, query *cmd.QueryParams) bool {
 	tStart := tStart(query)
 	tEnd := tEnd(query)
 	lvl := query.GetLvl()
-	txt := query.GetTxt()
-	httpMethod := query.GetHttpMethod()
-	url := query.GetUrl()
-	responseStatus := query.GetResponseStatus()
 	msgT := msg.T.AsTime()
 	if tStart != nil && msgT.Before(*tStart) {
 		return false
@@ -67,22 +61,6 @@ func matchMsg(msg *cmd.Msg, query *cmd.QueryParams) bool {
 		return false
 	}
 	if lvl != cmd.Lvl_LVL_UNKNOWN && lvl != msg.GetLvl() {
-		return false
-	}
-	msgTxt := msg.GetTxt()
-	if txt != "" && !strings.Contains(strings.ToLower(msgTxt), strings.ToLower(txt)) {
-		return false
-	}
-	msgHttpMethod := msg.GetHttpMethod()
-	if httpMethod != cmd.HttpMethod_METHOD_UNKNOWN && httpMethod != msgHttpMethod {
-		return false
-	}
-	msgUrl := msg.GetUrl()
-	if url != "" && !strings.HasPrefix(msgUrl, url) {
-		return false
-	}
-	msgResponseStatus := msg.GetResponseStatus()
-	if responseStatus != 0 && responseStatus != msgResponseStatus {
 		return false
 	}
 	return true
