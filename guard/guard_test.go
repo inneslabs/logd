@@ -82,7 +82,7 @@ func TestSignAndVerify(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	}
-	signed := Sign([]byte("testsecret"), payload)
+	signed := pkg.Sign([]byte("testsecret"), payload)
 	p := &pkg.Pkg{}
 	err = pkg.Unpack(signed, p)
 	if err != nil {
@@ -104,6 +104,6 @@ func BenchmarkSign(b *testing.B) {
 	secret := []byte("testsecret")
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		Sign(secret, payload)
+		pkg.Sign(secret, payload)
 	}
 }
