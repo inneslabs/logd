@@ -14,7 +14,6 @@ require (
 )
 
 require (
-	github.com/inneslabs/fnpool v0.0.2
 	github.com/stretchr/testify v1.9.0
 	gopkg.in/yaml.v3 v3.0.1
 )

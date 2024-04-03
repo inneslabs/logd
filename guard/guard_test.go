@@ -5,8 +5,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inneslabs/logd/cmd"
 	"github.com/inneslabs/logd/pkg"
 	"github.com/stretchr/testify/assert"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func TestGuardGood(t *testing.T) {
@@ -66,4 +69,41 @@ func calculateSum(secret, timeBytes, payload []byte) []byte {
 	data = append(data, payload...)
 	h := sha256.Sum256(data)
 	return h[:]
+}
+
+func TestSignAndVerify(t *testing.T) {
+	payload, err := proto.Marshal(&cmd.Cmd{
+		Name: cmd.Name_WRITE,
+		Msg: &cmd.Msg{
+			T:   timestamppb.Now(),
+			Txt: "this is a test",
+		},
+	})
+	if err != nil {
+		t.FailNow()
+	}
+	signed := Sign([]byte("testsecret"), payload)
+	p := &pkg.Pkg{}
+	err = pkg.Unpack(signed, p)
+	if err != nil {
+		t.FailNow()
+	}
+}
+
+func BenchmarkSign(b *testing.B) {
+	payload, err := proto.Marshal(&cmd.Cmd{
+		Name: cmd.Name_WRITE,
+		Msg: &cmd.Msg{
+			T:   timestamppb.Now(),
+			Txt: "test",
+		},
+	})
+	if err != nil {
+		b.FailNow()
+	}
+	secret := []byte("testsecret")
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		Sign(secret, payload)
+	}
 }

@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/inneslabs/fnpool"
 	"github.com/inneslabs/logd/cmd"
 	"github.com/inneslabs/logd/guard"
 	"github.com/inneslabs/logd/pkg"
@@ -58,7 +57,6 @@ type UdpSvc struct {
 	secrets             *Secrets
 	logStore            *store.Store
 	pkgPool             *sync.Pool
-	workerPool          *fnpool.Pool
 	guard               *guard.Guard
 }
 
@@ -103,7 +101,6 @@ func NewSvc(cfg *Cfg) *UdpSvc {
 				}
 			},
 		},
-		workerPool: fnpool.NewPool(cfg.WorkerPoolSize),
 	}
 	go svc.listen()
 	go svc.tailReadWrite()
@@ -127,9 +124,6 @@ func (svc *UdpSvc) listen() {
 	}()
 	fmt.Println("listening udp on", svc.conn.LocalAddr())
 	<-svc.ctx.Done()
-	fmt.Println("packet handler pool stopping...")
-	svc.workerPool.StopAndWait()
-	fmt.Println("packet handler pool stopped")
 	fmt.Println("udp svc shutdown")
 }
 
@@ -236,4 +230,109 @@ func (svc *UdpSvc) reply(txt string, raddr netip.AddrPort) {
 		Txt: txt,
 	})
 	svc.conn.WriteToUDPAddrPort(payload, raddr)
+}
+
+func (svc *UdpSvc) handleWrite(c *cmd.Cmd) {
+	msgBytes, err := proto.Marshal(c.Msg)
+	if err != nil {
+		return
+	}
+	segments := strings.Split(c.Msg.GetKey(), "/")
+	if len(segments) < 3 {
+		return
+	}
+	// IMPORTANT:
+	// This is currently how msg keys are mapped to the rings
+	storeKey := fmt.Sprintf("/%s/%s", segments[1], segments[2])
+	svc.logStore.Write(storeKey, msgBytes)
+	svc.forSubs <- &ProtoPair{
+		Msg:   c.Msg,
+		Bytes: msgBytes,
+	}
+}
+
+const (
+	hardLimit = 100000
+	EndMsg    = "+END"
+)
+
+func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort) {
+	query := command.GetQueryParams()
+	offset := query.GetOffset()
+	limit := limit(query.GetLimit())
+	keyPrefix := query.GetKeyPrefix()
+	rateLimit := rate.NewLimiter(svc.queryRateLimit, svc.queryRateLimitBurst)
+	for log := range svc.logStore.Read(keyPrefix, offset, limit) {
+		msg := &cmd.Msg{}
+		err := proto.Unmarshal(log, msg)
+		if err != nil {
+			fmt.Println("query unmarshal protobuf err:", err)
+			return
+		}
+		if matchMsg(msg, query) {
+			err := rateLimit.Wait(svc.ctx)
+			if err != nil {
+				return
+			}
+			_, err = svc.conn.WriteToUDPAddrPort(log, raddr)
+			if err != nil {
+				return
+			}
+		}
+	}
+	time.Sleep(time.Millisecond * 10) // ensure +END arrives last
+	rateLimit.Wait(svc.ctx)
+	svc.reply(EndMsg, raddr)
+}
+
+func matchMsg(msg *cmd.Msg, query *cmd.QueryParams) bool {
+	keyPrefix := query.GetKeyPrefix()
+	if keyPrefix != "" && !strings.HasPrefix(msg.GetKey(), keyPrefix) {
+		return false
+	}
+	tStart := tStart(query)
+	tEnd := tEnd(query)
+	lvl := query.GetLvl()
+	msgT := msg.T.AsTime()
+	if tStart != nil && msgT.Before(*tStart) {
+		return false
+	}
+	if tEnd != nil && msgT.After(*tEnd) {
+		return false
+	}
+	if lvl != cmd.Lvl_LVL_UNKNOWN && lvl != msg.GetLvl() {
+		return false
+	}
+	return true
+}
+
+func limit(qLimit uint32) uint32 {
+	if qLimit != 0 && qLimit < hardLimit {
+		return qLimit
+	}
+	return hardLimit
+}
+
+func tStart(q *cmd.QueryParams) *time.Time {
+	if q == nil {
+		return nil
+	}
+	tStartPtr := q.GetTStart()
+	if tStartPtr == nil {
+		return nil
+	}
+	tStart := tStartPtr.AsTime()
+	return &tStart
+}
+
+func tEnd(q *cmd.QueryParams) *time.Time {
+	if q == nil {
+		return nil
+	}
+	tEndPtr := q.GetTEnd()
+	if tEndPtr == nil {
+		return nil
+	}
+	tEnd := tEndPtr.AsTime()
+	return &tEnd
 }

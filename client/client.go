@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/inneslabs/logd/cmd"
-	"github.com/inneslabs/logd/sign"
+	"github.com/inneslabs/logd/guard"
 	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
 )
@@ -58,7 +58,7 @@ func (cl *Client) SignCmd(ctx context.Context, command *cmd.Cmd, secret []byte) 
 	if err != nil {
 		return nil, fmt.Errorf("err marshalling cmd: %w", err)
 	}
-	return sign.Sign(secret, payload), nil
+	return guard.Sign(secret, payload), nil
 }
 
 func (cl *Client) Wait(ctx context.Context) error {

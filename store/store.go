@@ -32,8 +32,8 @@ func NewStore(cfg *Cfg) *Store {
 // Write writes to the ring of key, or fallback ring
 func (s *Store) Write(key string, data []byte) {
 	s.nWrites.Add(uint64(1))
-	part := s.rings[key]
-	if part == nil {
+	part, ok := s.rings[key]
+	if !ok {
 		s.fallback.Write(data)
 		return
 	}
