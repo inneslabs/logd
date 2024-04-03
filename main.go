@@ -11,7 +11,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/inneslabs/cfg"
 	"github.com/inneslabs/logd/app"
 	"github.com/inneslabs/logd/guard"
 	"github.com/inneslabs/logd/store"
@@ -26,8 +25,12 @@ type Cfg struct {
 }
 
 func main() {
+	const (
+		secretsFile = "/etc/logd/secrets.yml"
+		configFile  = "/etc/logd/config.yml"
+	)
 	ctx := rootCtx()
-	commit, err := os.ReadFile("commit")
+	commit, err := os.ReadFile("/etc/logd/commit")
 	if err != nil {
 		fmt.Println("failed to read commit file:", err)
 	}
@@ -62,20 +65,17 @@ func main() {
 			FallbackSize: 100000,
 		},
 	}
-	err = cfg.Load("logdrc.yml", "/etc", config)
+	err = loadYml(configFile, config)
 	if err != nil {
-		fmt.Println("no config file loaded")
+		fmt.Printf("err loading %q: %v\n", configFile, err)
 	}
-	secYml, err := os.ReadFile("secrets.yml")
-	if err == nil {
-		sec := &udp.Secrets{}
-		err = yaml.Unmarshal(secYml, sec)
-		if err != nil {
-			panic(err)
-		} else {
-			config.Udp.Secrets = sec
-			fmt.Println("secrets loaded from secrets.yml")
-		}
+	sec := &udp.Secrets{}
+	err = loadYml(secretsFile, sec)
+	if err != nil {
+		fmt.Printf("err loading %q: %v\n", secretsFile, err)
+	} else {
+		config.Udp.Secrets = sec
+		fmt.Printf("secrets loaded from %q\n", secretsFile)
 	}
 	logStore := store.NewStore(config.Store)
 	config.App.LogStore = logStore
@@ -112,4 +112,18 @@ func rootCtx() context.Context {
 func secretHash(secret string) string {
 	readSecretSum := sha256.Sum256([]byte(secret))
 	return hex.EncodeToString(readSecretSum[:])
+}
+
+func loadYml(fname string, v interface{}) error {
+	file, err := os.OpenFile(fname, os.O_RDONLY, 0o777)
+	if err != nil {
+		return fmt.Errorf("err opening file: %w", err)
+	}
+	defer file.Close()
+	dec := yaml.NewDecoder(file)
+	err = dec.Decode(v)
+	if err != nil {
+		return fmt.Errorf("err decoding cfg file (%s): %w", fname, err)
+	}
+	return nil
 }
