@@ -1,3 +1,10 @@
+# Next iteration:
+- Data must persist after restart (write to file)
+- Cleaner & more secure protocol
+- Simpler
+- Faster (>200K/s on my machine)
+
+
 # Tail & query real-time logs of many apps.
 A simple program for streaming log data, built on Protobuf, SHA256, and UDP.
 
