@@ -45,7 +45,7 @@ func main() {
 				Write: "bitcoin",
 			},
 			Guard: &guard.Cfg{
-				HistorySize: 1000,
+				HistorySize: 100,
 				SumTtl:      100 * time.Millisecond,
 			},
 			TailRateLimitEvery:  50 * time.Microsecond,
