@@ -2,8 +2,6 @@ github.com/davecgh/go-spew v1.1.1 h1:vj9j/u1bqnvCEfJOwUhtlOARqs3+rkHYY13jYWTU97c
 github.com/davecgh/go-spew v1.1.1/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/google/go-cmp v0.5.5 h1:Khx7svrCpmxxtHBq5j2mp/xVjsi8hQMfNLvJFAlrGgU=
 github.com/google/go-cmp v0.5.5/go.mod h1:v8dTdLbMG2kIc/vJvl+f65V22dbkXbowE6jgT/gNBxE=
-github.com/inneslabs/cfg v0.0.4 h1:VGChVZbv4gl5TtU2iMqcq/pvLwubGmkkGYEFhjMiV+E=
-github.com/inneslabs/cfg v0.0.4/go.mod h1:p5rR5J2UNhmiy5C3HgYgto8dOxUzOCk/1VE02BGzw0k=
 github.com/inneslabs/fnpool v0.0.2 h1:RRXu/w47sIThn6MvartiJo7lzi5Qf9rKpnif/7V8RdY=
 github.com/inneslabs/fnpool v0.0.2/go.mod h1:yH81xXNyHSRAo5vWdbdc8/cI0BArADck3NGVanZ2KNc=
 github.com/inneslabs/jfmt v0.2.0 h1:oqcAl1JQBuwADjtLNnQtQ6f0JJ2qqDOOtmvflWqaF98=
