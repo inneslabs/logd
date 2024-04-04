@@ -13,21 +13,16 @@ import (
 	"github.com/inneslabs/logd/guard"
 	"github.com/inneslabs/logd/pkg"
 	"github.com/inneslabs/logd/store"
-	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
 )
 
 type Cfg struct {
-	WorkerPoolSize      int           `yaml:"worker_pool_size"`
-	LaddrPort           string        `yaml:"laddr_port"`
-	Guard               *guard.Cfg    `yaml:"guard"`
-	Secrets             *Secrets      `yaml:"secrets"`
-	TailRateLimitEvery  time.Duration `yaml:"tail_rate_limit_every"`
-	TailRateLimitBurst  int           `yaml:"tail_rate_limit_burst"`
-	QueryRateLimitEvery time.Duration `yaml:"query_rate_limit_every"`
-	QueryRateLimitBurst int           `yaml:"query_rate_limit_burst"`
-	LogStore            *store.Store
-	Ctx                 context.Context
+	WorkerPoolSize int        `yaml:"worker_pool_size"`
+	LaddrPort      string     `yaml:"laddr_port"`
+	Guard          *guard.Cfg `yaml:"guard"`
+	Secrets        *Secrets   `yaml:"secrets"`
+	LogStore       *store.Store
+	Ctx            context.Context
 }
 
 type Secrets struct {
@@ -43,28 +38,23 @@ const (
 )
 
 type UdpSvc struct {
-	ctx                 context.Context
-	laddrPort           string
-	conn                *net.UDPConn
-	tails               map[string]*Tail
-	ping                chan string
-	newTail             chan *Tail
-	forSubs             chan *ProtoPair
-	tailRateLimit       rate.Limit
-	queryRateLimit      rate.Limit
-	tailRateLimitBurst  int
-	queryRateLimitBurst int
-	secrets             *Secrets
-	logStore            *store.Store
-	pkgPool             *sync.Pool
-	guard               *guard.Guard
+	ctx       context.Context
+	laddrPort string
+	conn      *net.UDPConn
+	tails     map[string]*Tail
+	ping      chan string
+	newTail   chan *Tail
+	forSubs   chan *ProtoPair
+	secrets   *Secrets
+	logStore  *store.Store
+	pkgPool   *sync.Pool
+	guard     *guard.Guard
 }
 
 type Tail struct {
 	raddr       netip.AddrPort
 	lastPing    time.Time
 	queryParams *cmd.QueryParams
-	rateLimiter *rate.Limiter
 }
 
 type Packet struct {
@@ -79,19 +69,15 @@ type ProtoPair struct {
 
 func NewSvc(cfg *Cfg) *UdpSvc {
 	svc := &UdpSvc{
-		ctx:                 cfg.Ctx,
-		laddrPort:           cfg.LaddrPort,
-		guard:               guard.NewGuard(cfg.Guard),
-		tails:               make(map[string]*Tail),
-		forSubs:             make(chan *ProtoPair, 1),
-		ping:                make(chan string, 1),
-		newTail:             make(chan *Tail, 1),
-		tailRateLimit:       rate.Every(cfg.TailRateLimitEvery),
-		queryRateLimit:      rate.Every(cfg.QueryRateLimitEvery),
-		tailRateLimitBurst:  cfg.TailRateLimitBurst,
-		queryRateLimitBurst: cfg.QueryRateLimitBurst,
-		secrets:             cfg.Secrets,
-		logStore:            cfg.LogStore,
+		ctx:       cfg.Ctx,
+		laddrPort: cfg.LaddrPort,
+		guard:     guard.NewGuard(cfg.Guard),
+		tails:     make(map[string]*Tail),
+		forSubs:   make(chan *ProtoPair, 1),
+		ping:      make(chan string, 1),
+		newTail:   make(chan *Tail, 1),
+		secrets:   cfg.Secrets,
+		logStore:  cfg.LogStore,
 		pkgPool: &sync.Pool{
 			New: func() any {
 				return &pkg.Pkg{
@@ -157,7 +143,6 @@ func (svc *UdpSvc) readPacket() {
 			raddr:       raddr,
 			lastPing:    time.Now(),
 			queryParams: c.GetQueryParams(),
-			rateLimiter: rate.NewLimiter(svc.tailRateLimit, svc.tailRateLimitBurst),
 		}
 		svc.reply("\rtailing logs\033[0K", raddr)
 		fmt.Println("got new tail", raddr.String())
@@ -182,7 +167,6 @@ func (svc *UdpSvc) tailReadWrite() {
 				if !shouldSendToTail(tail, protoPair.Msg) {
 					continue
 				}
-				tail.rateLimiter.Wait(svc.ctx)
 				_, err := svc.conn.WriteToUDPAddrPort(protoPair.Bytes, tail.raddr)
 				if err != nil {
 					fmt.Printf("write udp err: (%s) %s\n", raddr, err)
@@ -261,7 +245,6 @@ func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort) {
 	offset := query.GetOffset()
 	limit := limit(query.GetLimit())
 	keyPrefix := query.GetKeyPrefix()
-	rateLimit := rate.NewLimiter(svc.queryRateLimit, svc.queryRateLimitBurst)
 	for log := range svc.logStore.Read(keyPrefix, offset, limit) {
 		msg := &cmd.Msg{}
 		err := proto.Unmarshal(log, msg)
@@ -270,18 +253,15 @@ func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort) {
 			return
 		}
 		if matchMsg(msg, query) {
-			err := rateLimit.Wait(svc.ctx)
-			if err != nil {
-				return
-			}
+			// possibly wait here a few microseconds
+			// before sending to prevent packet loss
 			_, err = svc.conn.WriteToUDPAddrPort(log, raddr)
 			if err != nil {
 				return
 			}
 		}
 	}
-	time.Sleep(time.Millisecond * 10) // ensure +END arrives last
-	rateLimit.Wait(svc.ctx)
+	time.Sleep(10 * time.Millisecond) // ensure +END arrives last
 	svc.reply(EndMsg, raddr)
 }
 

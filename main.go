@@ -48,10 +48,6 @@ func main() {
 				HistorySize: 100,
 				SumTtl:      100 * time.Millisecond,
 			},
-			TailRateLimitEvery:  50 * time.Microsecond,
-			TailRateLimitBurst:  4,
-			QueryRateLimitEvery: 50 * time.Microsecond,
-			QueryRateLimitBurst: 4,
 		},
 		App: &app.Cfg{
 			Ctx:                      ctx,
