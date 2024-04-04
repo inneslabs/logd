@@ -51,9 +51,9 @@ func (cl *Client) ping(ctx context.Context, secret []byte) {
 }
 
 func (c *Client) readTailMsgs(out chan<- *cmd.Msg) {
-	buf := make([]byte, udp.MaxPacketSize)
+	buf := make([]byte, c.packetBufferSize)
 	for {
-		buf = buf[:udp.MaxPacketSize] // re-slice to capacity
+		buf = buf[:c.packetBufferSize] // re-slice to capacity
 		n, err := c.conn.Read(buf)
 		if err != nil {
 			fmt.Printf("\rerror reading from conn: %s\n", err)

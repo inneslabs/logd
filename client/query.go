@@ -33,7 +33,7 @@ func (cl *Client) Query(ctx context.Context, q *cmd.QueryParams, secret []byte) 
 
 func (c *Client) readQueryMsgs(out chan<- *cmd.Msg) {
 	defer close(out)
-	buf := make([]byte, udp.MaxPacketSize)
+	buf := make([]byte, c.packetBufferSize)
 	for {
 		m, err := c.readQueryMsg(buf)
 		if err != nil {
@@ -48,7 +48,7 @@ func (c *Client) readQueryMsgs(out chan<- *cmd.Msg) {
 }
 
 func (c *Client) readQueryMsg(buf []byte) (*cmd.Msg, error) {
-	buf = buf[:udp.MaxPacketSize] // re-slice to capacity
+	buf = buf[:c.packetBufferSize] // re-slice to capacity
 	deadline := time.Now().Add(500 * time.Millisecond)
 	if err := c.conn.SetReadDeadline(deadline); err != nil {
 		return nil, err

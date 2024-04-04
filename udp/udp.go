@@ -17,19 +17,19 @@ import (
 )
 
 const (
-	MaxPacketSize     = 1024
 	ReplyKey          = "//logd"
 	EndMsg            = "+END"
 	PingPeriod        = 2 * time.Second
 	PingLossTolerance = 3
-	QueryHardLimit    = 100000
 )
 
 type Cfg struct {
-	LaddrPort string     `yaml:"laddr_port"`
-	Guard     *guard.Cfg `yaml:"guard"`
-	Secrets   *Secrets   `yaml:"secrets"`
-	LogStore  *store.Store
+	LaddrPort        string     `yaml:"laddr_port"`
+	PacketBufferSize int        `yaml:"packet_buffer_size"`
+	QueryHardLimit   uint32     `yaml:"query_hard_limit"`
+	Guard            *guard.Cfg `yaml:"guard"`
+	Secrets          *Secrets   `yaml:"secrets"`
+	LogStore         *store.Store
 }
 
 type Secrets struct {
@@ -38,16 +38,18 @@ type Secrets struct {
 }
 
 type UdpSvc struct {
-	laddrPort string
-	conn      *net.UDPConn
-	tails     map[string]*tail
-	ping      chan string
-	newTail   chan *tail
-	write     chan *cmd.Msg
-	secrets   *Secrets
-	logStore  *store.Store
-	pkgPool   *sync.Pool
-	guard     *guard.Guard
+	laddrPort        string
+	packetBufferSize int
+	queryHardLimit   uint32
+	secrets          *Secrets
+	conn             *net.UDPConn
+	tails            map[string]*tail
+	ping             chan string
+	newTail          chan *tail
+	write            chan *cmd.Msg
+	logStore         *store.Store
+	pkgPool          *sync.Pool
+	guard            *guard.Guard
 }
 
 type tail struct {
@@ -58,20 +60,22 @@ type tail struct {
 
 func NewSvc(ctx context.Context, cfg *Cfg) *UdpSvc {
 	svc := &UdpSvc{
-		laddrPort: cfg.LaddrPort,
-		guard:     guard.NewGuard(ctx, cfg.Guard),
-		tails:     make(map[string]*tail),
-		write:     make(chan *cmd.Msg, 100),
-		ping:      make(chan string, 1),
-		newTail:   make(chan *tail, 1),
-		secrets:   cfg.Secrets,
-		logStore:  cfg.LogStore,
+		laddrPort:        cfg.LaddrPort,
+		packetBufferSize: cfg.PacketBufferSize,
+		queryHardLimit:   cfg.QueryHardLimit,
+		guard:            guard.NewGuard(ctx, cfg.Guard),
+		tails:            make(map[string]*tail),
+		write:            make(chan *cmd.Msg, 100),
+		ping:             make(chan string, 1),
+		newTail:          make(chan *tail, 1),
+		secrets:          cfg.Secrets,
+		logStore:         cfg.LogStore,
 		pkgPool: &sync.Pool{
 			New: func() any {
 				return &pkg.Pkg{
 					Sum:       make([]byte, 32), // sha256
 					TimeBytes: make([]byte, 8),  // uint64
-					Payload:   make([]byte, MaxPacketSize),
+					Payload:   make([]byte, cfg.PacketBufferSize),
 				}
 			},
 		},
@@ -103,7 +107,7 @@ func (svc *UdpSvc) listen() {
 }
 
 func (svc *UdpSvc) readPacket() error {
-	buf := make([]byte, MaxPacketSize)
+	buf := make([]byte, svc.packetBufferSize)
 	n, raddr, err := svc.conn.ReadFromUDPAddrPort(buf)
 	if err != nil {
 		return err
@@ -236,8 +240,8 @@ func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort) {
 	keyPrefix := query.GetKeyPrefix()
 	offset := query.GetOffset()
 	limit := query.GetLimit()
-	if limit > QueryHardLimit {
-		limit = QueryHardLimit
+	if limit > svc.queryHardLimit {
+		limit = svc.queryHardLimit
 	}
 	for log := range svc.logStore.Read(keyPrefix, offset, limit) {
 		msg := &cmd.Msg{}

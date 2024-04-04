@@ -36,7 +36,9 @@ func main() {
 	fmt.Println("🌱 running", string(commit))
 	config := &Cfg{
 		Udp: &udp.Cfg{
-			LaddrPort: ":6102",
+			LaddrPort:        ":6102",
+			PacketBufferSize: 1920,
+			QueryHardLimit:   50000,
 			Secrets: &udp.Secrets{
 				Read:  "gold",
 				Write: "bitcoin",

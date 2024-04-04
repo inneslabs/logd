@@ -14,15 +14,17 @@ import (
 )
 
 type Client struct {
-	conn        net.Conn
-	rateLimiter *rate.Limiter
+	conn             net.Conn
+	rateLimiter      *rate.Limiter
+	packetBufferSize int
 }
 
 type Cfg struct {
-	Host           string        `yaml:"host"`
-	Port           int           `yaml:"port"`
-	RateLimitEvery time.Duration `yaml:"ratelimit_every"`
-	RateLimitBurst int           `yaml:"ratelimit_burst"`
+	Host             string        `yaml:"host"`
+	Port             int           `yaml:"port"`
+	PacketBufferSize int           `yaml:"packet_buffer_size"`
+	RateLimitEvery   time.Duration `yaml:"ratelimit_every"`
+	RateLimitBurst   int           `yaml:"ratelimit_burst"`
 }
 
 func NewClient(cfg *Cfg) (*Client, error) {
@@ -50,7 +52,7 @@ func NewClient(cfg *Cfg) (*Client, error) {
 			rate.Every(cfg.RateLimitEvery),
 			cfg.RateLimitBurst)
 	}
-	return &Client{conn, rateLimiter}, nil
+	return &Client{conn, rateLimiter, cfg.PacketBufferSize}, nil
 }
 
 func (cl *Client) SignCmd(ctx context.Context, command *cmd.Cmd, secret []byte) ([]byte, error) {
