@@ -40,7 +40,7 @@ func (c *Client) readQueryMsgs(out chan<- *cmd.Msg) {
 			fmt.Println("failed to read msg:", err)
 			return
 		}
-		if m.GetKey() == udp.ReplyKey && m.GetTxt() == udp.EndMsg {
+		if m.Key == udp.ReplyKey && m.Txt == udp.EndMsg {
 			return
 		}
 		out <- m

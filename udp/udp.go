@@ -3,6 +3,7 @@ package udp
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"net"
 	"net/netip"
 	"strings"
@@ -110,19 +111,27 @@ func (svc *UdpSvc) readPacket() error {
 	buf := make([]byte, svc.packetBufferSize)
 	n, raddr, err := svc.conn.ReadFromUDPAddrPort(buf)
 	if err != nil {
-		return err
+		return fmt.Errorf("err reading from socket: %w", err)
 	}
 	// get a pointer to a reusable pkg.Pkg to unpack packet
 	p, _ := svc.pkgPool.Get().(*pkg.Pkg)
 	defer svc.pkgPool.Put(p)
 	err = pkg.Unpack(buf[:n], p)
 	if err != nil {
-		return err
+		// probably garbage, log once in a while
+		if rand.Intn(100) == 0 {
+			fmt.Println("err unpacking packet: %w", err)
+		}
+		return nil
 	}
 	c := &cmd.Cmd{}
 	err = proto.Unmarshal(p.Payload, c)
 	if err != nil {
-		return err
+		// probably garbage, log once in a while
+		if rand.Intn(100) == 0 {
+			fmt.Println("err unmarshaling cmd: %w", err)
+		}
+		return nil
 	}
 	switch c.Name {
 	case cmd.Name_WRITE:
@@ -240,7 +249,7 @@ func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort) {
 	keyPrefix := query.GetKeyPrefix()
 	offset := query.GetOffset()
 	limit := query.GetLimit()
-	if limit > svc.queryHardLimit {
+	if limit == 0 || limit > svc.queryHardLimit {
 		limit = svc.queryHardLimit
 	}
 	for log := range svc.logStore.Read(keyPrefix, offset, limit) {
@@ -250,13 +259,15 @@ func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort) {
 			fmt.Println("query unmarshal protobuf err:", err)
 			return
 		}
-		if msgMatchesQuery(msg, query) {
-			// possibly wait here a few microseconds
-			// before sending to prevent packet loss
-			_, err = svc.conn.WriteToUDPAddrPort(log, raddr)
-			if err != nil {
-				return
-			}
+		if !msgMatchesQuery(msg, query) {
+			continue
+		}
+		// possibly wait here a few microseconds
+		// before sending to prevent packet loss
+		_, err = svc.conn.WriteToUDPAddrPort(log, raddr)
+		if err != nil {
+			fmt.Println("err writing to conn:", err)
+			return
 		}
 	}
 	time.Sleep(15 * time.Millisecond) // ensure +END arrives last
@@ -268,17 +279,17 @@ func msgMatchesQuery(msg *cmd.Msg, query *cmd.QueryParams) bool {
 	if keyPrefix != "" && !strings.HasPrefix(msg.GetKey(), keyPrefix) {
 		return false
 	}
-	tStart := tStart(query)
-	tEnd := tEnd(query)
 	lvl := query.GetLvl()
+	if lvl != cmd.Lvl_LVL_UNKNOWN && lvl != msg.Lvl {
+		return false
+	}
+	tStart := tStart(query)
 	msgT := msg.T.AsTime()
 	if tStart != nil && msgT.Before(*tStart) {
 		return false
 	}
+	tEnd := tEnd(query)
 	if tEnd != nil && msgT.After(*tEnd) {
-		return false
-	}
-	if lvl != cmd.Lvl_LVL_UNKNOWN && lvl != msg.GetLvl() {
 		return false
 	}
 	return true

@@ -1,6 +1,7 @@
 package store
 
 import (
+	"fmt"
 	"strings"
 	"sync/atomic"
 
@@ -76,6 +77,7 @@ func (s *Store) Read(keyPrefix string, offset, limit uint32) <-chan []byte {
 		for key, r := range s.rings {
 			if strings.HasPrefix(key, keyPrefix) {
 				matchedPrefix = true
+				fmt.Println("reading from", key)
 				for d := range r.Read(offset, limit-count) {
 					out <- d
 					count++
@@ -86,6 +88,7 @@ func (s *Store) Read(keyPrefix string, offset, limit uint32) <-chan []byte {
 			}
 		}
 		if !matchedPrefix {
+			fmt.Println("reading from fallback")
 			for d := range s.fallback.Read(offset, limit) {
 				out <- d
 			}
