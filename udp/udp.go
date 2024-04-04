@@ -16,26 +16,25 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
+const (
+	MaxPacketSize     = 1024
+	ReplyKey          = "//logd"
+	PingPeriod        = 2 * time.Second
+	PingLossTolerance = 3
+)
+
 type Cfg struct {
-	WorkerPoolSize int        `yaml:"worker_pool_size"`
-	LaddrPort      string     `yaml:"laddr_port"`
-	Guard          *guard.Cfg `yaml:"guard"`
-	Secrets        *Secrets   `yaml:"secrets"`
-	LogStore       *store.Store
-	Ctx            context.Context
+	LaddrPort string     `yaml:"laddr_port"`
+	Guard     *guard.Cfg `yaml:"guard"`
+	Secrets   *Secrets   `yaml:"secrets"`
+	LogStore  *store.Store
+	Ctx       context.Context
 }
 
 type Secrets struct {
 	Read  string `yaml:"read"`
 	Write string `yaml:"write"`
 }
-
-const (
-	MaxPacketSize         = 1024
-	ReplyKey              = "//logd"
-	PingPeriod            = time.Second * 2
-	KickAfterMissingPings = 3
-)
 
 type UdpSvc struct {
 	ctx       context.Context
@@ -181,7 +180,8 @@ func (svc *UdpSvc) tailReadWrite() {
 			svc.tails[newTail.raddr.String()] = newTail
 		case <-time.After(PingPeriod):
 			for _, tail := range svc.tails {
-				if tail.lastPing.Before(time.Now().Add(-(PingPeriod * KickAfterMissingPings))) {
+				threshold := time.Now().Add(-(PingPeriod * PingLossTolerance))
+				if tail.lastPing.Before(threshold) {
 					delete(svc.tails, tail.raddr.String())
 					fmt.Printf("kicked %s\n", tail.raddr.String())
 					svc.reply("kick", tail.raddr)

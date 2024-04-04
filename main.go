@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"runtime"
 	"syscall"
 	"time"
 
@@ -37,9 +36,8 @@ func main() {
 	fmt.Println("🌱 running", string(commit))
 	config := &Cfg{
 		Udp: &udp.Cfg{
-			Ctx:            ctx,
-			WorkerPoolSize: runtime.NumCPU(),
-			LaddrPort:      ":6102",
+			Ctx:       ctx,
+			LaddrPort: ":6102",
 			Secrets: &udp.Secrets{
 				Read:  "gold",
 				Write: "bitcoin",
