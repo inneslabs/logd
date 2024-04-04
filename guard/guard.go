@@ -2,60 +2,71 @@ package guard
 
 import (
 	"bytes"
-	"container/ring"
+	"context"
 	"crypto/sha256"
 	"errors"
 	"fmt"
-	"sync"
+	"math/rand"
 	"time"
 
 	"github.com/inneslabs/logd/pkg"
+	cuckoo "github.com/seiflotfy/cuckoofilter"
 )
 
 type Guard struct {
-	history *ring.Ring
-	mutex   sync.Mutex
-	sumTtl  time.Duration
+	filter    *cuckoo.Filter
+	packetTtl time.Duration
+	quit      chan struct{}
 }
 
 type Cfg struct {
-	HistorySize int           `yaml:"history_size"`
-	SumTtl      time.Duration `yaml:"sum_ttl"`
+	FilterCap uint          `yaml:"filter_cap"` // Filter capacity
+	FilterTtl time.Duration `yaml:"filter_ttl"` // Reset filter after
+	PacketTtl time.Duration `yaml:"packet_ttl"` // Packet validity
 }
 
-func NewGuard(cfg *Cfg) *Guard {
-	return &Guard{
-		history: ring.New(cfg.HistorySize),
-		sumTtl:  cfg.SumTtl,
+func NewGuard(ctx context.Context, cfg *Cfg) *Guard {
+	g := &Guard{
+		filter:    cuckoo.NewFilter(cfg.FilterCap),
+		packetTtl: cfg.PacketTtl,
+		quit:      make(chan struct{}),
 	}
+	go func() {
+		done := ctx.Done()
+		for {
+			select {
+			case <-done:
+				g.quit <- struct{}{}
+				return
+			case <-time.After(cfg.FilterTtl):
+				g.filter.Reset()
+			}
+		}
+	}()
+	return g
 }
 
 func (g *Guard) Good(secret []byte, p *pkg.Pkg) bool {
 	authed, err := g.verify(secret, p)
 	if err != nil || !authed {
+		fmt.Printf("unauthorised: err: %v\n", err)
 		return false
 	}
-	return !g.replay(p.Sum)
+	if g.replay(p.Sum) {
+		if rand.Intn(1000) < 1 {
+			fmt.Println("~1000 replays detected")
+		}
+		return false
+	}
+	return true
+}
+
+func (g *Guard) Quit() <-chan struct{} {
+	return g.quit
 }
 
 func (g *Guard) replay(sum []byte) bool {
-	g.mutex.Lock()
-	defer g.mutex.Unlock()
-	found := false
-	g.history.Do(func(v interface{}) {
-		b, ok := v.([]byte)
-		if !ok {
-			return
-		}
-		if bytes.Equal(b, sum) {
-			found = true
-		}
-	})
-	if !found {
-		g.history.Value = sum
-		g.history = g.history.Next()
-	}
-	return found
+	return !g.filter.InsertUnique(sum)
 }
 
 func (g *Guard) verify(secret []byte, p *pkg.Pkg) (bool, error) {
@@ -64,7 +75,7 @@ func (g *Guard) verify(secret []byte, p *pkg.Pkg) (bool, error) {
 	if err != nil {
 		return false, fmt.Errorf("convert bytes to time err: %w", err)
 	}
-	if t.After(time.Now()) || t.Before(time.Now().Add(-g.sumTtl)) {
+	if t.After(time.Now()) || t.Before(time.Now().Add(-g.packetTtl)) {
 		return false, errors.New("time is outside of threshold")
 	}
 	totalLen := len(secret) + len(p.TimeBytes) + len(p.Payload)

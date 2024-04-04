@@ -19,8 +19,10 @@ import (
 const (
 	MaxPacketSize     = 1024
 	ReplyKey          = "//logd"
+	EndMsg            = "+END"
 	PingPeriod        = 2 * time.Second
 	PingLossTolerance = 3
+	QueryHardLimit    = 100000
 )
 
 type Cfg struct {
@@ -28,7 +30,6 @@ type Cfg struct {
 	Guard     *guard.Cfg `yaml:"guard"`
 	Secrets   *Secrets   `yaml:"secrets"`
 	LogStore  *store.Store
-	Ctx       context.Context
 }
 
 type Secrets struct {
@@ -37,44 +38,32 @@ type Secrets struct {
 }
 
 type UdpSvc struct {
-	ctx       context.Context
 	laddrPort string
 	conn      *net.UDPConn
-	tails     map[string]*Tail
+	tails     map[string]*tail
 	ping      chan string
-	newTail   chan *Tail
-	forSubs   chan *ProtoPair
+	newTail   chan *tail
+	write     chan *cmd.Msg
 	secrets   *Secrets
 	logStore  *store.Store
 	pkgPool   *sync.Pool
 	guard     *guard.Guard
 }
 
-type Tail struct {
+type tail struct {
 	raddr       netip.AddrPort
 	lastPing    time.Time
 	queryParams *cmd.QueryParams
 }
 
-type Packet struct {
-	Data  []byte
-	Raddr netip.AddrPort
-}
-
-type ProtoPair struct {
-	Msg   *cmd.Msg
-	Bytes []byte
-}
-
-func NewSvc(cfg *Cfg) *UdpSvc {
+func NewSvc(ctx context.Context, cfg *Cfg) *UdpSvc {
 	svc := &UdpSvc{
-		ctx:       cfg.Ctx,
 		laddrPort: cfg.LaddrPort,
-		guard:     guard.NewGuard(cfg.Guard),
-		tails:     make(map[string]*Tail),
-		forSubs:   make(chan *ProtoPair, 1),
+		guard:     guard.NewGuard(ctx, cfg.Guard),
+		tails:     make(map[string]*tail),
+		write:     make(chan *cmd.Msg, 100),
 		ping:      make(chan string, 1),
-		newTail:   make(chan *Tail, 1),
+		newTail:   make(chan *tail, 1),
 		secrets:   cfg.Secrets,
 		logStore:  cfg.LogStore,
 		pkgPool: &sync.Pool{
@@ -88,7 +77,7 @@ func NewSvc(cfg *Cfg) *UdpSvc {
 		},
 	}
 	go svc.listen()
-	go svc.tailReadWrite()
+	go svc.theThing()
 	return svc
 }
 
@@ -101,76 +90,71 @@ func (svc *UdpSvc) listen() {
 	if err != nil {
 		panic(fmt.Errorf("listen udp err: %w", err))
 	}
-	defer svc.conn.Close()
 	go func() {
+		defer svc.conn.Close()
 		for {
-			svc.readPacket()
+			err := svc.readPacket()
+			if err != nil {
+				fmt.Println(err)
+			}
 		}
 	}()
 	fmt.Println("listening udp on", svc.conn.LocalAddr())
-	<-svc.ctx.Done()
-	fmt.Println("udp svc shutdown")
 }
 
-func (svc *UdpSvc) readPacket() {
+func (svc *UdpSvc) readPacket() error {
 	buf := make([]byte, MaxPacketSize)
 	n, raddr, err := svc.conn.ReadFromUDPAddrPort(buf)
 	if err != nil {
-		return
+		return err
 	}
+	// get a pointer to a reusable pkg.Pkg to unpack packet
 	p, _ := svc.pkgPool.Get().(*pkg.Pkg)
+	defer svc.pkgPool.Put(p)
 	err = pkg.Unpack(buf[:n], p)
 	if err != nil {
-		return
+		return err
 	}
 	c := &cmd.Cmd{}
 	err = proto.Unmarshal(p.Payload, c)
 	if err != nil {
-		return
+		return err
 	}
-	switch c.GetName() {
+	switch c.Name {
 	case cmd.Name_WRITE:
 		if !svc.guard.Good([]byte(svc.secrets.Write), p) {
-			break
+			return nil
 		}
-		svc.handleWrite(c)
+		svc.write <- c.Msg
 	case cmd.Name_TAIL:
 		if !svc.guard.Good([]byte(svc.secrets.Read), p) {
-			break
+			return nil
 		}
-		svc.newTail <- &Tail{
+		svc.newTail <- &tail{
 			raddr:       raddr,
 			lastPing:    time.Now(),
 			queryParams: c.GetQueryParams(),
 		}
 		svc.reply("\rtailing logs\033[0K", raddr)
-		fmt.Println("got new tail", raddr.String())
 	case cmd.Name_PING:
 		if !svc.guard.Good([]byte(svc.secrets.Read), p) {
-			break
+			return nil
 		}
 		svc.ping <- raddr.String()
 	case cmd.Name_QUERY:
-		if svc.guard.Good([]byte(svc.secrets.Read), p) {
-			svc.handleQuery(c, raddr)
+		if !svc.guard.Good([]byte(svc.secrets.Read), p) {
+			return nil
 		}
+		go svc.handleQuery(c, raddr)
 	}
-	svc.pkgPool.Put(p)
+	return nil
 }
 
-func (svc *UdpSvc) tailReadWrite() {
+func (svc *UdpSvc) theThing() {
 	for {
 		select {
-		case protoPair := <-svc.forSubs:
-			for raddr, tail := range svc.tails {
-				if !shouldSendToTail(tail, protoPair.Msg) {
-					continue
-				}
-				_, err := svc.conn.WriteToUDPAddrPort(protoPair.Bytes, tail.raddr)
-				if err != nil {
-					fmt.Printf("write udp err: (%s) %s\n", raddr, err)
-				}
-			}
+		case msg := <-svc.write:
+			svc.handleWrite(msg)
 		case ping := <-svc.ping:
 			tail, ok := svc.tails[ping]
 			if ok {
@@ -187,20 +171,42 @@ func (svc *UdpSvc) tailReadWrite() {
 					svc.reply("kick", tail.raddr)
 				}
 			}
-		case <-svc.ctx.Done():
-			fmt.Println("writeToSubs ended")
-			return
 		}
 	}
 }
 
-func shouldSendToTail(tail *Tail, msg *cmd.Msg) bool {
-	if tail.queryParams != nil {
-		keyPrefix := tail.queryParams.GetKeyPrefix()
+func (svc *UdpSvc) handleWrite(msg *cmd.Msg) error {
+	segments := strings.Split(msg.Key, "/")
+	if len(segments) < 3 {
+		return fmt.Errorf("invalid key %q: too few segments", msg.Key)
+	}
+	msgBytes, err := proto.Marshal(msg)
+	if err != nil {
+		return fmt.Errorf("err marshaling proto msg: %w", err)
+	}
+	// IMPORTANT:
+	// This is currently how msg keys are mapped to the rings
+	storeKey := fmt.Sprintf("/%s/%s", segments[1], segments[2])
+	svc.logStore.Write(storeKey, msgBytes)
+	for raddr, tail := range svc.tails {
+		if !shouldSendToTail(tail, msg) {
+			continue
+		}
+		_, err := svc.conn.WriteToUDPAddrPort(msgBytes, tail.raddr)
+		if err != nil {
+			return fmt.Errorf("err writing to %s: %v", raddr, err)
+		}
+	}
+	return nil
+}
+
+func shouldSendToTail(t *tail, msg *cmd.Msg) bool {
+	if t.queryParams != nil {
+		keyPrefix := t.queryParams.GetKeyPrefix()
 		if keyPrefix != "" && !strings.HasPrefix(msg.GetKey(), keyPrefix) {
 			return false
 		}
-		qLvl := tail.queryParams.GetLvl()
+		qLvl := t.queryParams.GetLvl()
 		if qLvl != cmd.Lvl_LVL_UNKNOWN && qLvl > msg.GetLvl() {
 			return false
 		}
@@ -209,42 +215,30 @@ func shouldSendToTail(tail *Tail, msg *cmd.Msg) bool {
 }
 
 func (svc *UdpSvc) reply(txt string, raddr netip.AddrPort) {
-	payload, _ := proto.Marshal(&cmd.Msg{
+	fmt.Printf("reply to %s: %q\n", raddr, txt)
+	payload, err := proto.Marshal(&cmd.Msg{
 		Key: ReplyKey,
 		Txt: txt,
 	})
-	svc.conn.WriteToUDPAddrPort(payload, raddr)
-}
-
-func (svc *UdpSvc) handleWrite(c *cmd.Cmd) {
-	msgBytes, err := proto.Marshal(c.Msg)
 	if err != nil {
+		fmt.Printf("err marshaling proto msg: %v\n", err)
 		return
 	}
-	segments := strings.Split(c.Msg.GetKey(), "/")
-	if len(segments) < 3 {
+	_, err = svc.conn.WriteToUDPAddrPort(payload, raddr)
+	if err != nil {
+		fmt.Printf("err replying to %s: %v\n", raddr, err)
 		return
-	}
-	// IMPORTANT:
-	// This is currently how msg keys are mapped to the rings
-	storeKey := fmt.Sprintf("/%s/%s", segments[1], segments[2])
-	svc.logStore.Write(storeKey, msgBytes)
-	svc.forSubs <- &ProtoPair{
-		Msg:   c.Msg,
-		Bytes: msgBytes,
 	}
 }
-
-const (
-	hardLimit = 100000
-	EndMsg    = "+END"
-)
 
 func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort) {
 	query := command.GetQueryParams()
-	offset := query.GetOffset()
-	limit := limit(query.GetLimit())
 	keyPrefix := query.GetKeyPrefix()
+	offset := query.GetOffset()
+	limit := query.GetLimit()
+	if limit > QueryHardLimit {
+		limit = QueryHardLimit
+	}
 	for log := range svc.logStore.Read(keyPrefix, offset, limit) {
 		msg := &cmd.Msg{}
 		err := proto.Unmarshal(log, msg)
@@ -252,7 +246,7 @@ func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort) {
 			fmt.Println("query unmarshal protobuf err:", err)
 			return
 		}
-		if matchMsg(msg, query) {
+		if msgMatchesQuery(msg, query) {
 			// possibly wait here a few microseconds
 			// before sending to prevent packet loss
 			_, err = svc.conn.WriteToUDPAddrPort(log, raddr)
@@ -261,11 +255,11 @@ func (svc *UdpSvc) handleQuery(command *cmd.Cmd, raddr netip.AddrPort) {
 			}
 		}
 	}
-	time.Sleep(10 * time.Millisecond) // ensure +END arrives last
+	time.Sleep(15 * time.Millisecond) // ensure +END arrives last
 	svc.reply(EndMsg, raddr)
 }
 
-func matchMsg(msg *cmd.Msg, query *cmd.QueryParams) bool {
+func msgMatchesQuery(msg *cmd.Msg, query *cmd.QueryParams) bool {
 	keyPrefix := query.GetKeyPrefix()
 	if keyPrefix != "" && !strings.HasPrefix(msg.GetKey(), keyPrefix) {
 		return false
@@ -284,13 +278,6 @@ func matchMsg(msg *cmd.Msg, query *cmd.QueryParams) bool {
 		return false
 	}
 	return true
-}
-
-func limit(qLimit uint32) uint32 {
-	if qLimit != 0 && qLimit < hardLimit {
-		return qLimit
-	}
-	return hardLimit
 }
 
 func tStart(q *cmd.QueryParams) *time.Time {

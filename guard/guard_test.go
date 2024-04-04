@@ -1,66 +1,72 @@
 package guard
 
 import (
+	"context"
 	"crypto/sha256"
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/inneslabs/logd/cmd"
 	"github.com/inneslabs/logd/pkg"
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func TestGuardGood(t *testing.T) {
+var cfg = &Cfg{
+	FilterCap: 1000000,
+	FilterTtl: 10 * time.Second,
+	PacketTtl: 5 * time.Minute,
+}
+
+func TestWithReplay(t *testing.T) {
 	cfg := &Cfg{
-		HistorySize: 10,
-		SumTtl:      5 * time.Minute,
+		FilterCap: 1000000,
+		PacketTtl: 5 * time.Minute,
 	}
-	guard := NewGuard(cfg)
+	guard := NewGuard(context.Background(), cfg)
 	secret := []byte("secret")
-	currentTime := time.Now()
-	timeBytes, _ := currentTime.Add(-2 * time.Minute).MarshalBinary()
+	timeBytes, _ := time.Now().MarshalBinary()
 	payload := []byte("payload")
 	sum := calculateSum(secret, timeBytes, payload)
-
 	p := &pkg.Pkg{
 		TimeBytes: timeBytes,
 		Payload:   payload,
 		Sum:       sum,
 	}
-
-	assert.True(t, guard.Good(secret, p), "Expected package to be good")
-
-	assert.False(t, guard.Good(secret, p), "Expected package to be rejected due to replay")
+	require.True(t, guard.Good(secret, p), "Expected package to be good")
+	require.False(t, guard.Good(secret, p), "Expected package to be rejected due to replay")
 }
 
-func TestGuardReplay(t *testing.T) {
-	cfg := &Cfg{
-		HistorySize: 2,
-		SumTtl:      5 * time.Minute,
-	}
-	guard := NewGuard(cfg)
-	secret := []byte("secret")
-	currentTime := time.Now()
-	timeBytes, _ := currentTime.MarshalBinary()
+func TestWrongSecret(t *testing.T) {
+	guard := NewGuard(context.Background(), cfg)
+	timeBytes, _ := time.Now().MarshalBinary()
 	payload := []byte("payload")
-	sum := calculateSum(secret, timeBytes, payload)
-
-	p := &pkg.Pkg{
+	sum := calculateSum([]byte("secret"), timeBytes, payload)
+	require.False(t, guard.Good([]byte("wrong_secret"), &pkg.Pkg{
 		TimeBytes: timeBytes,
 		Payload:   payload,
 		Sum:       sum,
-	}
-
-	assert.False(t, guard.replay(sum), "Expected sum not to be found in history")
-
-	guard.Good(secret, p) // This should add the sum to the history
-
-	assert.True(t, guard.replay(sum), "Expected sum to be found in history due to replay")
+	}))
 }
 
-// Helper function to calculate sum for testing
+func TestDone(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	g := NewGuard(ctx, cfg)
+	go func() {
+		time.After(time.Millisecond)
+		cancel()
+	}()
+	select {
+	case <-time.After(time.Second):
+		t.FailNow()
+	case <-g.Quit():
+		fmt.Println("guard quit, looks good")
+	}
+}
+
+// Re-implmemented to test
 func calculateSum(secret, timeBytes, payload []byte) []byte {
 	totalLen := len(secret) + len(timeBytes) + len(payload)
 	data := make([]byte, 0, totalLen)
@@ -69,25 +75,6 @@ func calculateSum(secret, timeBytes, payload []byte) []byte {
 	data = append(data, payload...)
 	h := sha256.Sum256(data)
 	return h[:]
-}
-
-func TestSignAndVerify(t *testing.T) {
-	payload, err := proto.Marshal(&cmd.Cmd{
-		Name: cmd.Name_WRITE,
-		Msg: &cmd.Msg{
-			T:   timestamppb.Now(),
-			Txt: "this is a test",
-		},
-	})
-	if err != nil {
-		t.FailNow()
-	}
-	signed := pkg.Sign([]byte("testsecret"), payload)
-	p := &pkg.Pkg{}
-	err = pkg.Unpack(signed, p)
-	if err != nil {
-		t.FailNow()
-	}
 }
 
 func BenchmarkSign(b *testing.B) {

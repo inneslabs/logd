@@ -12,8 +12,6 @@ import (
 )
 
 type App struct {
-	// cfg
-	ctx                      context.Context
 	logStore                 *store.Store
 	rateLimitEvery           time.Duration
 	rateLimitBurst           int
@@ -29,7 +27,6 @@ type App struct {
 }
 
 type Cfg struct {
-	Ctx                      context.Context
 	LogStore                 *store.Store
 	Commit                   []byte
 	LaddrPort                string        `yaml:"laddr_port"`
@@ -45,9 +42,8 @@ type client struct {
 	lastSeen time.Time
 }
 
-func NewApp(cfg *Cfg) *App {
+func NewApp(ctx context.Context, cfg *Cfg) *App {
 	app := &App{
-		ctx:                      cfg.Ctx,
 		logStore:                 cfg.LogStore,
 		rateLimitEvery:           cfg.RateLimitEvery,
 		rateLimitBurst:           cfg.RateLimitBurst,
@@ -61,11 +57,11 @@ func NewApp(cfg *Cfg) *App {
 	}
 	go app.cleanupClients()
 	go app.measureStatus()
-	go app.serve()
+	go app.serve(ctx)
 	return app
 }
 
-func (app *App) serve() {
+func (app *App) serve(ctx context.Context) {
 	mux := http.NewServeMux()
 	mux.Handle("/", app.rateLimitMiddleware(
 		app.corsMiddleware(
@@ -85,7 +81,7 @@ func (app *App) serve() {
 			panic(fmt.Sprintf("failed to listen http: %v\n", err))
 		}
 	}()
-	<-app.ctx.Done()
+	<-ctx.Done()
 	app.shutdown(server)
 }
 
@@ -135,18 +131,14 @@ func (app *App) getRateLimiter(r *http.Request) *rate.Limiter {
 // cleanupClients removes clients that have not been seen for 10 seconds.
 func (a *App) cleanupClients() {
 	for {
-		select {
-		case <-a.ctx.Done():
-			return
-		case <-time.After(10 * time.Second):
-			a.clientMu.Lock()
-			for key, client := range a.clients {
-				if time.Since(client.lastSeen) > 10*time.Second {
-					delete(a.clients, key)
-				}
+		<-time.After(10 * time.Second)
+		a.clientMu.Lock()
+		for key, client := range a.clients {
+			if time.Since(client.lastSeen) > 10*time.Second {
+				delete(a.clients, key)
 			}
-			a.clientMu.Unlock()
 		}
+		a.clientMu.Unlock()
 	}
 }
 

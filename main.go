@@ -25,8 +25,8 @@ type Cfg struct {
 
 func main() {
 	const (
-		secretsFile = "/etc/logd/secrets.yml"
-		configFile  = "/etc/logd/config.yml"
+		secretsFile = "/etc/inneslabs/logd/secrets.yml"
+		configFile  = "/etc/inneslabs/logd/config.yml"
 	)
 	ctx := rootCtx()
 	commit, err := os.ReadFile("/etc/logd/commit")
@@ -36,19 +36,18 @@ func main() {
 	fmt.Println("🌱 running", string(commit))
 	config := &Cfg{
 		Udp: &udp.Cfg{
-			Ctx:       ctx,
 			LaddrPort: ":6102",
 			Secrets: &udp.Secrets{
 				Read:  "gold",
 				Write: "bitcoin",
 			},
 			Guard: &guard.Cfg{
-				HistorySize: 100,
-				SumTtl:      100 * time.Millisecond,
+				FilterCap: 16000000,
+				FilterTtl: 10 * time.Second,
+				PacketTtl: 200 * time.Millisecond,
 			},
 		},
 		App: &app.Cfg{
-			Ctx:                      ctx,
 			Commit:                   commit,
 			LaddrPort:                ":6101",
 			RateLimitEvery:           200 * time.Millisecond,
@@ -74,13 +73,14 @@ func main() {
 	logStore := store.NewStore(config.Store)
 	config.App.LogStore = logStore
 	config.Udp.LogStore = logStore
-	udp.NewSvc(config.Udp)
-	app.NewApp(config.App)
+	udp.NewSvc(ctx, config.Udp)
+	app.NewApp(ctx, config.App)
 	fmt.Println("read secret sha256:", secretHash(config.Udp.Secrets.Read))
 	fmt.Println("write secret sha256:", secretHash(config.Udp.Secrets.Write))
 	fmt.Printf("guard: %+v\n", config.Udp.Guard)
 	<-ctx.Done()
-	fmt.Println("all routines ended")
+	<-time.After(time.Millisecond)
+	fmt.Println("logd ended")
 }
 
 // cancelOnKillSig cancels the context on os interrupt kill signal
