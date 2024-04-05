@@ -120,7 +120,7 @@ func (svc *UdpSvc) readPacket() error {
 	if err != nil {
 		// probably garbage, log once in a while
 		if rand.Intn(100) == 0 {
-			fmt.Println("err unpacking packet: %w", err)
+			fmt.Printf("~100x err unpacking packet: %v\n", err)
 		}
 		return nil
 	}
@@ -129,7 +129,7 @@ func (svc *UdpSvc) readPacket() error {
 	if err != nil {
 		// probably garbage, log once in a while
 		if rand.Intn(100) == 0 {
-			fmt.Println("err unmarshaling cmd: %w", err)
+			fmt.Printf("~100x err unmarshaling cmd: %v\n", err)
 		}
 		return nil
 	}
