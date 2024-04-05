@@ -41,22 +41,13 @@ func (s *Store) Write(key string, data []byte) {
 	part.Write(data)
 }
 
-func (s *Store) Heads() map[string]uint32 {
-	heads := make(map[string]uint32, len(s.rings)+1)
+func (s *Store) HeadsAndSizes() map[string][2]uint32 {
+	info := make(map[string][2]uint32, len(s.rings)+1)
 	for key, ring := range s.rings {
-		heads[key] = ring.Head()
+		info[key] = [2]uint32{ring.Head(), ring.Size()}
 	}
-	heads["_fallback"] = s.fallback.Head()
-	return heads
-}
-
-func (s *Store) Sizes() map[string]uint32 {
-	sizes := make(map[string]uint32, len(s.rings)+1)
-	for key, ring := range s.rings {
-		sizes[key] = ring.Size()
-	}
-	sizes["_fallback"] = s.fallback.Size()
-	return sizes
+	info["_fallback"] = [2]uint32{s.fallback.Head(), s.fallback.Size()}
+	return info
 }
 
 // Read reads up to limit items, from offset,

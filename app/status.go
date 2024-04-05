@@ -13,22 +13,18 @@ import (
 )
 
 type Status struct {
-	Commit  string       `json:"commit"`
-	Uptime  string       `json:"uptime"`
-	Machine *MachineInfo `json:"machine"`
-	Store   *StoreInfo   `json:"store"`
-}
-
-type MachineInfo struct {
-	NCpu     int    `json:"ncpu"`
-	MemAlloc uint64 `json:"mem_alloc"`
-	MemSys   uint64 `json:"mem_sys"`
+	Commit   string     `json:"commit"`
+	Uptime   string     `json:"uptime"`
+	NCpu     int        `json:"ncpu"`
+	MemAlloc uint64     `json:"mem_alloc"`
+	MemSys   uint64     `json:"mem_sys"`
+	Store    *StoreInfo `json:"store"`
 }
 
 type StoreInfo struct {
 	NWrites uint64      `json:"nwrites"`
-	Rings   []*RingInfo `json:"rings"`
 	MaxRate uint64      `json:"max_rate"`
+	Rings   []*RingInfo `json:"rings"`
 }
 
 type RingInfo struct {
@@ -60,14 +56,13 @@ func (app *App) measureStatus() {
 		lastWrites = writes
 		lastTime = time.Now()
 
-		heads := app.logStore.Heads()
-		sizes := app.logStore.Sizes()
-		rings := make([]*RingInfo, 0, len(heads))
-		for key := range heads {
+		headsAndSizes := app.logStore.HeadsAndSizes()
+		rings := make([]*RingInfo, 0, len(headsAndSizes))
+		for key := range headsAndSizes {
 			rings = append(rings, &RingInfo{
 				Key:  key,
-				Head: heads[key],
-				Size: sizes[key],
+				Head: headsAndSizes[key][0],
+				Size: headsAndSizes[key][1],
 			})
 		}
 		sort.Slice(rings, func(i, j int) bool {
@@ -78,13 +73,11 @@ func (app *App) measureStatus() {
 		runtime.ReadMemStats(memStats)
 
 		info := &Status{
-			Commit: app.commit,
-			Uptime: jfmt.FmtDuration(time.Since(app.started)),
-			Machine: &MachineInfo{
-				NCpu:     ncpu,
-				MemAlloc: memStats.HeapAlloc,
-				MemSys:   memStats.Sys,
-			},
+			Commit:   app.commit,
+			Uptime:   jfmt.FmtDuration(time.Since(app.started)),
+			NCpu:     ncpu,
+			MemAlloc: memStats.HeapAlloc,
+			MemSys:   memStats.Sys,
 			Store: &StoreInfo{
 				NWrites: writes,
 				Rings:   rings,
