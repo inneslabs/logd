@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/inneslabs/jfmt"
+	"github.com/intob/jfmt"
 )
 
 type Status struct {

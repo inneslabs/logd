@@ -1,6 +1,38 @@
-# Next iteration:
-- Data must persist after restart (write to file)
-- Cleaner & more secure protocol
+# v0.16.0:
+v0.15 through to v0.16 has been about solving replays. Since v0, the message consists of the following:
+[_TIME_BYTES]
+```go
+// pkg/pkg.go
+type Pkg struct {
+	Sum, TimeBytes, Payload []byte
+}
+
+func Unpack(data []byte, pkg *Pkg) error {
+	if len(data) < 32+15 {
+		return errors.New("data too short")
+	}
+	pkg.Sum = data[:32]              /*32B sha256*/
+	pkg.TimeBytes = data[32 : 32+15] /*15B time*/
+	pkg.Payload = data[32+15:]       /* payload */
+	return nil
+}
+
+func Sign(secret, payload []byte) []byte {
+	timeBytes, _ := time.Now().MarshalBinary() // 15B
+	data := make([]byte, 0, 32 /* sha256 */ +15 /* time */ +len(payload))
+	data = append(data, secret...)
+	data = append(data, timeBytes...)
+	data = append(data, payload...)
+	h := sha256.Sum256(data)
+	data = append(data[:0], h[:32]...)
+	data = append(data, timeBytes...)
+	return append(data, payload...)
+}
+```
+## First iteration was a ring buffer of the sha256 sums, named `history`. This did not scale well, because the more packets received, the larger the history must be, but then the more expensive it is to verify each packet is not in the history.
+
+
+## Cuckoo filter
 - Simpler
 - Faster (>200K/s on my machine)
 

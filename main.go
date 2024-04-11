@@ -10,10 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/inneslabs/logd/app"
-	"github.com/inneslabs/logd/guard"
-	"github.com/inneslabs/logd/store"
-	"github.com/inneslabs/logd/udp"
+	"github.com/intob/logd/app"
+	"github.com/intob/logd/guard"
+	"github.com/intob/logd/store"
+	"github.com/intob/logd/udp"
 	"gopkg.in/yaml.v3"
 )
 
@@ -25,8 +25,8 @@ type Cfg struct {
 
 func main() {
 	const (
-		secretsFile = "/etc/inneslabs/logd/secrets.yml"
-		configFile  = "/etc/inneslabs/logd/config.yml"
+		secretsFile = "/etc/intob/logd/secrets.yml"
+		configFile  = "/etc/intob/logd/config.yml"
 	)
 	ctx := rootCtx()
 	commit, err := os.ReadFile("/etc/logd/commit")
@@ -37,16 +37,19 @@ func main() {
 	config := &Cfg{
 		Udp: &udp.Cfg{
 			LaddrPort:        ":6102",
-			PacketBufferSize: 1920,
-			QueryHardLimit:   50000,
+			PacketBufferSize: 1460,  // typical WiFi MTU, feel free to increase
+			QueryHardLimit:   50000, // maybe use offset
 			Secrets: &udp.Secrets{
 				Read:  "gold",
 				Write: "bitcoin",
 			},
 			Guard: &guard.Cfg{
-				FilterCap: 16000000,
+				FilterCap: 16000000, // balance for memory, larger size reduces false positives
+				// now I know, we need 2 smaller filters, A & B.
+				// Each must pass, and each is reset off-kilter to prevent
+				// replay immediately after filter reset.
 				FilterTtl: 10 * time.Second,
-				PacketTtl: 200 * time.Millisecond,
+				PacketTtl: 200 * time.Millisecond, // keep to a minimum, reduce reliance on filter
 			},
 		},
 		App: &app.Cfg{

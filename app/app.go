@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/inneslabs/logd/store"
+	"github.com/intob/logd/store"
 	"golang.org/x/time/rate"
 )
 

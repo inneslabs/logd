@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/inneslabs/logd/client"
-	"github.com/inneslabs/logd/cmd"
+	"github.com/intob/logd/client"
+	"github.com/intob/logd/cmd"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

@@ -1,4 +1,4 @@
-module github.com/inneslabs/logd
+module github.com/intob/logd
 
 go 1.22.0
 
@@ -6,11 +6,11 @@ require google.golang.org/protobuf v1.33.0
 
 require golang.org/x/time v0.5.0
 
-require github.com/inneslabs/jfmt v0.2.0
+require github.com/intob/jfmt v0.2.1
 
 require (
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/dgryski/go-metro v0.0.0-20200812162917-85c65e2d0165 // indirect
+	github.com/dgryski/go-metro v0.0.0-20211217172704-adc40b04c140 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 )
 

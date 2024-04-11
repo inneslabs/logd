@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inneslabs/logd/cmd"
-	"github.com/inneslabs/logd/pkg"
+	"github.com/intob/logd/cmd"
+	"github.com/intob/logd/pkg"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"

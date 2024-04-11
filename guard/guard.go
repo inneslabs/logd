@@ -1,15 +1,12 @@
 package guard
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha256"
-	"errors"
 	"fmt"
 	"math/rand"
 	"time"
 
-	"github.com/inneslabs/logd/pkg"
+	"github.com/intob/logd/pkg"
 	cuckoo "github.com/seiflotfy/cuckoofilter"
 )
 
@@ -47,7 +44,7 @@ func NewGuard(ctx context.Context, cfg *Cfg) *Guard {
 }
 
 func (g *Guard) Good(secret []byte, p *pkg.Pkg) bool {
-	authed, err := g.verify(secret, p)
+	authed, err := pkg.Verify(secret, g.packetTtl, p)
 	if err != nil || !authed {
 		fmt.Printf("unauthorised: err: %v\n", err)
 		return false
@@ -67,22 +64,4 @@ func (g *Guard) Quit() <-chan struct{} {
 
 func (g *Guard) replay(sum []byte) bool {
 	return !g.filter.InsertUnique(sum)
-}
-
-func (g *Guard) verify(secret []byte, p *pkg.Pkg) (bool, error) {
-	var t time.Time
-	err := t.UnmarshalBinary(p.TimeBytes)
-	if err != nil {
-		return false, fmt.Errorf("convert bytes to time err: %w", err)
-	}
-	if t.After(time.Now()) || t.Before(time.Now().Add(-g.packetTtl)) {
-		return false, errors.New("time is outside of threshold")
-	}
-	totalLen := len(secret) + len(p.TimeBytes) + len(p.Payload)
-	data := make([]byte, 0, totalLen)
-	data = append(data, secret...)
-	data = append(data, p.TimeBytes...)
-	data = append(data, p.Payload...)
-	h := sha256.Sum256(data)
-	return bytes.Equal(p.Sum, h[:32]), nil
 }

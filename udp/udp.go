@@ -10,10 +10,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/inneslabs/logd/cmd"
-	"github.com/inneslabs/logd/guard"
-	"github.com/inneslabs/logd/pkg"
-	"github.com/inneslabs/logd/store"
+	"github.com/intob/logd/cmd"
+	"github.com/intob/logd/guard"
+	"github.com/intob/logd/pkg"
+	"github.com/intob/logd/store"
 	"google.golang.org/protobuf/proto"
 )
 

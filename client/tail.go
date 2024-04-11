@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/inneslabs/logd/cmd"
-	"github.com/inneslabs/logd/udp"
+	"github.com/intob/logd/cmd"
+	"github.com/intob/logd/udp"
 	"google.golang.org/protobuf/proto"
 )
 

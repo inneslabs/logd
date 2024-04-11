@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/inneslabs/logd/cmd"
-	"github.com/inneslabs/logd/pkg"
+	"github.com/intob/logd/cmd"
+	"github.com/intob/logd/pkg"
 	"golang.org/x/time/rate"
 	"google.golang.org/protobuf/proto"
 )
